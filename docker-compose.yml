@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      target: development
+    # Kita menggunakan port 5173 (default Vite) dan 8443 (referensi di AGENTS.md)
+    ports:
+      - "5173:5173"
+      - "8443:8443"
+    volumes:
+      # Sinkronisasi folder lokal dengan folder /app di dalam container (Hot Reload)
+      - .:/app
+      # Mencegah node_modules di dalam container tertimpa oleh folder lokal
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      # Polling mungkin diperlukan untuk hot-reload jika Anda menggunakan Windows/WSL
+      - CHOKIDAR_USEPOLLING=true

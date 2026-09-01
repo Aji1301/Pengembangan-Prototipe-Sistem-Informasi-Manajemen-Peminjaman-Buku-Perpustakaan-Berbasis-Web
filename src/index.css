@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Fredoka', sans-serif;
+  --font-sans: 'Nunito', sans-serif;
+
+  --font-weight-400: 400;
+  --font-weight-500: 500;
+  --font-weight-600: 600;
+  --font-weight-700: 700;
+  --font-weight-800: 800;
+
+  --color-paper: #f4f8fb;
+  --color-paper-2: #e6eef5;
+  --color-ink: #3c4b62;
+  --color-ink-soft: #6f7c92;
+  --color-card: #ffffff;
+  --color-border: #dbe4ee;
+
+  /* primary #0A96E6 */
+  --color-forest: #0a96e6;
+  --color-forest-deep: #0872b4;
+  --color-forest-soft: #dcf0fc;
+  /* secondary / tertiary #B1D23A */
+  --color-amber: #b1d23a;
+  --color-amber-soft: #eef5d6;
+  --color-berry: #e35d8b;
+  --color-sky: #0a96e6;
+
+  --color-ok: #6fa32a;
+  --color-warn: #8a9d2e;
+  --color-danger: #e05264;
+
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-amber);
+  color: #fff;
+}
+
+/* Hide scrollbars until scrolling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: var(--color-border) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  background-clip: content-box;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-forest);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
