@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { prisma } from "../prisma.js";
 import { AuthRequest } from "../middlewares/auth.js";

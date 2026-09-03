@@ -9,21 +9,18 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
   const [membersCount, setMembersCount] = useState(0);
   const [categoriesCount, setCategoriesCount] = useState(0);
 
-  // Fetch real books and stats from MySQL database
+  // Fetch real books and stats from MySQL database concurrently with Promise.all
   useEffect(() => {
-    api.getBooks().then((res) => {
-      if (res && res.books) {
-        setBooks(res.books);
-      }
-    }).catch(() => { });
-
-    api.getStats().then((res) => {
-      if (res) {
-        setBooksCount(res.booksCount || 0);
-        setMembersCount(res.membersCount || 0);
-        setCategoriesCount(res.categoriesCount || 0);
-      }
-    }).catch(() => { });
+    Promise.all([api.getBooks(), api.getStats()])
+      .then(([booksRes, statsRes]) => {
+        if (booksRes && booksRes.books) setBooks(booksRes.books);
+        if (statsRes) {
+          setBooksCount(statsRes.booksCount || 0);
+          setMembersCount(statsRes.membersCount || 0);
+          setCategoriesCount(statsRes.categoriesCount || 0);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -114,12 +111,12 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
 
               {/* Floating Bottom Badge */}
               <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-2.5 rounded-2xl shadow-xl border border-border flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-[#009BF2] grid place-items-center text-white text-xs font-900">
-                  
+                <div className="h-10 w-10 rounded-full bg-white grid place-items-center text-white text-xs font-900 overflow-hidden p-1 border border-border shadow-xs">
+                  <img src="/logo.png" alt="Kancil" className="w-full h-full object-contain" />
                 </div>
                 <div>
-                  <p className="font-800 text-xs text-ink leading-tight">Halo, aku Kancil!</p>
-                  <p className="text-[0.7rem] text-ink-soft">Temanmu membaca</p>
+                  <p className="font-800 text-xs text-ink leading-tight">Halo, aku Kancil! 🦌</p>
+                  <p className="text-[0.7rem] text-ink-soft font-600">Temanmu membaca</p>
                 </div>
               </div>
             </div>
