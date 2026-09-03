@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   BOOKS, CATEGORIES, LOANS, CURRENT_USER, bookById,
   formatDate, daysUntil, type Book,
@@ -6,6 +6,7 @@ import {
 import {
   Logo, Icon, Button, Card, BookCover, StatusBadge, Stars, inputCls, Field,
 } from "./ui";
+import { api } from "../lib/api";
 
 type View = "home" | "catalog" | "detail" | "myloans" | "history" | "profile";
 
@@ -17,12 +18,67 @@ const NAV: { id: View; label: string; icon: keyof typeof Icon }[] = [
   { id: "profile", label: "Profil", icon: "user" },
 ];
 
-export default function StudentApp({ onLogout }: { onLogout: () => void }) {
+export default function StudentApp({ user, onLogout }: { user?: any; onLogout: () => void }) {
   const [view, setView] = useState<View>("home");
   const [selected, setSelected] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("Semua");
   const [reserved, setReserved] = useState<Set<string>>(new Set());
+  const [booksList, setBooksList] = useState<Book[]>(BOOKS);
+  const [borrowLoading, setBorrowLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(user || null);
+
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+    }
+    api.getMe().then((res) => {
+      if (res && res.user) {
+        setCurrentUser(res.user);
+      }
+    }).catch(() => { });
+  }, [user]);
+
+  const fetchBooks = () => {
+    api.getBooks().then((res) => {
+      if (res && res.books && res.books.length > 0) {
+        const mappedBooks: Book[] = res.books.map((b: any) => ({
+          id: String(b.id),
+          title: b.title,
+          author: b.author,
+          publisher: b.publisher || "-",
+          year: b.year || 2026,
+          category: b.category?.name || "Umum",
+          cover: b.coverUrl || b.cover || "from-forest to-forest-deep",
+          coverUrl: b.coverUrl,
+          status: b.availableStock > 0 ? "Tersedia" : "Dipinjam",
+          description: b.description || "-",
+          copies: b.stock,
+          available: b.availableStock,
+          rating: 4.8,
+          popularity: 95,
+        }));
+        setBooksList(mappedBooks);
+      }
+    }).catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  const handleBorrowBook = async (bookId: string) => {
+    setBorrowLoading(true);
+    try {
+      await api.requestBorrow({ bookId: Number(bookId), days: 7 });
+      setReserved((s) => new Set(s).add(bookId));
+      fetchBooks();
+    } catch (err: any) {
+      setReserved((s) => new Set(s).add(bookId));
+    } finally {
+      setBorrowLoading(false);
+    }
+  };
 
   function openBook(b: Book) {
     setSelected(b);
@@ -32,6 +88,18 @@ export default function StudentApp({ onLogout }: { onLogout: () => void }) {
     if (cat) setCategory(cat);
     setView("catalog");
   }
+
+  const [returnedCount, setReturnedCount] = useState(0);
+
+  useEffect(() => {
+    api.getMyBorrowings().then((res) => {
+      if (res && res.borrowings) {
+        setReturnedCount(res.borrowings.filter((l: any) => l.status === "RETURNED").length);
+      }
+    }).catch(() => { });
+  }, []);
+
+  const progressPercent = Math.min(100, Math.round((returnedCount / 5) * 100));
 
   return (
     <div className="min-h-full lg:grid lg:grid-cols-[260px_1fr]">
@@ -46,9 +114,8 @@ export default function StudentApp({ onLogout }: { onLogout: () => void }) {
               <button
                 key={n.id}
                 onClick={() => setView(n.id)}
-                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-700 transition ${
-                  active ? "bg-forest text-paper shadow-sm" : "text-ink-soft hover:bg-forest-soft hover:text-forest"
-                }`}
+                className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left font-700 transition ${active ? "bg-forest text-paper shadow-sm" : "text-ink-soft hover:bg-forest-soft hover:text-forest"
+                  }`}
               >
                 <IconC className="w-5 h-5" /> {n.label}
               </button>
@@ -56,15 +123,7 @@ export default function StudentApp({ onLogout }: { onLogout: () => void }) {
           })}
         </nav>
         <div className="mt-auto">
-          <Card className="bg-amber-soft border-amber/20 p-4">
-            <div className="text-2xl">📚</div>
-            <p className="mt-1 font-display font-700 text-ink">Target Baca Bulan Ini</p>
-            <p className="text-sm text-ink-soft">3 dari 5 buku selesai</p>
-            <div className="mt-2 h-2 rounded-full bg-white/70">
-              <div className="h-full w-3/5 rounded-full bg-amber" />
-            </div>
-          </Card>
-          <button onClick={onLogout} className="mt-3 flex w-full items-center gap-3 rounded-2xl px-4 py-3 font-700 text-ink-soft hover:bg-danger/10 hover:text-danger">
+          <button onClick={onLogout} className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 font-700 text-ink-soft hover:bg-danger/10 hover:text-danger">
             <Icon.logout className="w-5 h-5" /> Keluar
           </button>
         </div>
@@ -79,12 +138,12 @@ export default function StudentApp({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 lg:py-10 pb-28 lg:pb-10">
-          {view === "home" && <Home onOpen={openBook} onCategory={goCatalog} onSeeAll={() => setView("catalog")} query={query} setQuery={setQuery} />}
-          {view === "catalog" && <Catalog onOpen={openBook} query={query} setQuery={setQuery} category={category} setCategory={setCategory} />}
-          {view === "detail" && selected && <Detail book={selected} onBack={() => setView("catalog")} reserved={reserved.has(selected.id)} onReserve={() => setReserved((s) => new Set(s).add(selected.id))} onOpen={openBook} />}
+          {view === "home" && <Home user={currentUser} booksList={booksList} onOpen={openBook} onCategory={goCatalog} onSeeAll={() => setView("catalog")} query={query} setQuery={setQuery} />}
+          {view === "catalog" && <Catalog booksList={booksList} onOpen={openBook} query={query} setQuery={setQuery} category={category} setCategory={setCategory} />}
+          {view === "detail" && selected && <Detail booksList={booksList} book={selected} onBack={() => setView("catalog")} reserved={reserved.has(selected.id)} onReserve={() => handleBorrowBook(selected.id)} onOpen={openBook} />}
           {view === "myloans" && <MyLoans onOpen={openBook} />}
           {view === "history" && <History />}
-          {view === "profile" && <Profile onLogout={onLogout} />}
+          {view === "profile" && <Profile user={currentUser} onLogout={onLogout} />}
         </div>
       </div>
 
@@ -105,99 +164,79 @@ export default function StudentApp({ onLogout }: { onLogout: () => void }) {
 }
 
 /* ---------------- Home ---------------- */
-function Home({ onOpen, onCategory, onSeeAll, query, setQuery }: { onOpen: (b: Book) => void; onCategory: (c: string) => void; onSeeAll: () => void; query: string; setQuery: (s: string) => void }) {
-  const popular = [...BOOKS].sort((a, b) => b.popularity - a.popularity).slice(0, 5);
-  const newest = [...BOOKS].sort((a, b) => b.year - a.year).slice(0, 5);
+function Home({ user, booksList, onOpen, onCategory, onSeeAll, query, setQuery }: { user?: any; booksList: Book[]; onOpen: (b: Book) => void; onCategory: (c: string) => void; onSeeAll: () => void; query: string; setQuery: (s: string) => void }) {
+  const popular = [...booksList].sort((a, b) => b.popularity - a.popularity).slice(0, 5);
+  const newest = [...booksList].sort((a, b) => b.year - a.year).slice(0, 5);
 
   return (
     <div className="space-y-9">
       <header>
-        <p className="text-ink-soft font-600">{greeting()}, Sabtu 30 Agustus</p>
-        <h1 className="mt-1 font-display text-4xl font-700">Halo, {CURRENT_USER.name.split(" ")[0]}! ✨</h1>
+        <p className="text-ink-soft font-600">{greeting()}, {user?.name || "Siswa"}! </p>
+        <h1 className="font-display text-4xl font-700">Mau baca buku apa hari ini? </h1>
       </header>
 
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl bg-forest p-7 text-paper sm:p-9">
-        <div className="pointer-events-none absolute -right-8 -top-8 text-[10rem] opacity-15 select-none">🦌</div>
-        <div className="relative max-w-xl">
-          <span className="rounded-full bg-amber px-3 py-1 text-xs font-800 uppercase tracking-wide text-ink">Buku Pilihan Minggu Ini</span>
-          <h2 className="mt-3 font-display text-3xl font-700 leading-tight">Akses instan ke 40.000+ buku anak & lainnya</h2>
-          <p className="mt-2 text-paper/80">Temukan dongeng nusantara favorit, jelajahi sains, dan mulai petualangan membacamu hari ini.</p>
-          <div className="mt-5">
-            <SearchBar value={query} onChange={setQuery} onSubmit={onSeeAll} />
-          </div>
-        </div>
+      <SearchBar value={query} onChange={setQuery} onSubmit={onSeeAll} />
+
+      {/* Category Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.name}
+            onClick={() => onCategory(c.name)}
+            className="inline-flex shrink-0 items-center rounded-full border border-border bg-white px-4 py-2 text-sm font-700 hover:border-forest hover:bg-forest-soft transition"
+          >
+            <span>{c.name}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Categories */}
-      <section>
-        <SectionHead title="Jelajahi Kategori" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {CATEGORIES.map((c) => (
-            <button key={c.name} onClick={() => onCategory(c.name)} className="group flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition hover:border-forest hover:shadow-sm">
-              <span className="grid h-11 w-11 place-items-center rounded-xl bg-forest-soft text-xl transition group-hover:scale-110">{c.emoji}</span>
-              <span className="font-700 leading-tight">{c.name}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <Shelf title="Populer & Rekomendasi" books={popular} onOpen={onOpen} onSeeAll={onSeeAll} />
-      <Shelf title="Baru Ditambahkan" books={newest} onOpen={onOpen} onSeeAll={onSeeAll} />
-
-      {/* Library info */}
-      <Card className="grid gap-6 p-6 sm:grid-cols-[1.4fr_1fr]">
-        <div>
-          <h3 className="font-display text-xl font-700">Perpustakaan KANCIL</h3>
-          <p className="mt-1 text-ink-soft">SD Negeri 03 Cendekia · Lantai 2, Gedung Utama. Ruang baca yang nyaman untuk semua siswa dan guru.</p>
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <InfoRow icon="clock" label="Senin–Jumat" value="07.00 – 15.00" />
-            <InfoRow icon="swap" label="Maks. pinjam" value="3 buku / 14 hari" />
-          </div>
-        </div>
-        <div className="rounded-2xl bg-forest-soft p-5">
-          <div className="text-3xl">💡</div>
-          <p className="mt-2 font-700 text-forest-deep">Tahukah kamu?</p>
-          <p className="text-sm text-ink-soft">Kancil adalah simbol kecerdikan dalam dongeng Nusantara — sama seperti pembaca yang gemar berpikir!</p>
-        </div>
-      </Card>
+      <Shelf title="Paling Populer " books={popular} onOpen={onOpen} onSeeAll={onSeeAll} />
+      <Shelf title="Rilisan Terbaru " books={newest} onOpen={onOpen} onSeeAll={onSeeAll} />
     </div>
   );
 }
 
 /* ---------------- Catalog ---------------- */
-function Catalog({ onOpen, query, setQuery, category, setCategory }: { onOpen: (b: Book) => void; query: string; setQuery: (s: string) => void; category: string; setCategory: (c: string) => void }) {
+function Catalog({ booksList, onOpen, query, setQuery, category, setCategory }: { booksList: Book[]; onOpen: (b: Book) => void; query: string; setQuery: (s: string) => void; category: string; setCategory: (c: string) => void }) {
   const cats = ["Semua", ...CATEGORIES.map((c) => c.name)];
   const results = useMemo(() => {
-    return BOOKS.filter((b) => {
-      const okCat = category === "Semua" || b.category === category;
-      const q = query.trim().toLowerCase();
-      const okQ = !q || b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q);
-      return okCat && okQ;
+    return booksList.filter((b) => {
+      const matchQ =
+        !query.trim() ||
+        b.title.toLowerCase().includes(query.toLowerCase()) ||
+        b.author.toLowerCase().includes(query.toLowerCase());
+      const matchC = category === "Semua" || b.category === category;
+      return matchQ && matchC;
     });
-  }, [query, category]);
+  }, [query, category, booksList]);
 
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="font-display text-4xl font-700">Katalog Buku</h1>
-        <p className="mt-1 text-ink-soft">{results.length} buku ditemukan dari total {BOOKS.length} koleksi.</p>
+        <h1 className="font-display text-3xl font-700">Katalog Perpustakaan </h1>
+        <p className="mt-1 text-ink-soft">{results.length} buku ditemukan dari total {booksList.length} koleksi.</p>
       </header>
 
       <SearchBar value={query} onChange={setQuery} placeholder="Cari judul atau penulis…" />
 
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      {/* Category Filter */}
+      <div className="flex flex-wrap gap-2">
         {cats.map((c) => (
-          <button key={c} onClick={() => setCategory(c)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-700 transition ${category === c ? "bg-forest text-paper" : "border border-border bg-card text-ink-soft hover:border-forest"}`}>
+          <button
+            key={c}
+            onClick={() => setCategory(c)}
+            className={`rounded-full px-4 py-1.5 text-sm font-700 transition ${category === c ? "bg-forest text-paper" : "border border-border bg-card text-ink-soft hover:border-forest"
+              }`}
+          >
             {c}
           </button>
         ))}
       </div>
 
       {results.length === 0 ? (
-        <EmptyState emoji="🔎" title="Tidak ada buku yang cocok" desc="Coba kata kunci lain atau ganti kategori." />
+        <EmptyState emoji="🔍" title="Buku tidak ditemukan" desc="Coba kata kunci atau kategori yang berbeda." />
       ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-6">
           {results.map((b) => (
             <BookTile key={b.id} book={b} onOpen={onOpen} />
           ))}
@@ -208,8 +247,8 @@ function Catalog({ onOpen, query, setQuery, category, setCategory }: { onOpen: (
 }
 
 /* ---------------- Detail ---------------- */
-function Detail({ book, onBack, reserved, onReserve, onOpen }: { book: Book; onBack: () => void; reserved: boolean; onReserve: () => void; onOpen: (b: Book) => void }) {
-  const related = BOOKS.filter((b) => b.category === book.category && b.id !== book.id).slice(0, 5);
+function Detail({ booksList, book, onBack, reserved, onReserve, onOpen }: { booksList: Book[]; book: Book; onBack: () => void; reserved: boolean; onReserve: () => void; onOpen: (b: Book) => void }) {
+  const related = booksList.filter((b) => b.category === book.category && b.id !== book.id).slice(0, 5);
   const available = book.available > 0;
   return (
     <div className="space-y-8">
@@ -267,7 +306,18 @@ function Detail({ book, onBack, reserved, onReserve, onOpen }: { book: Book; onB
 
 /* ---------------- My Loans ---------------- */
 function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
-  const active = LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan" && l.returnDate === null);
+  const [loansList, setLoansList] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getMyBorrowings().then((res) => {
+      if (res && res.borrowings) {
+        setLoansList(res.borrowings);
+      }
+    }).catch(() => { });
+  }, []);
+
+  const active = loansList.length > 0 ? loansList : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan");
+
   return (
     <div className="space-y-6">
       <header>
@@ -276,30 +326,49 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
       </header>
 
       {active.length === 0 ? (
-        <EmptyState emoji="📖" title="Belum ada pinjaman aktif" desc="Jelajahi katalog dan pinjam buku pertamamu!" />
+        <EmptyState emoji="" title="Belum ada pinjaman aktif" desc="Jelajahi katalog dan pinjam buku pertamamu!" />
       ) : (
         <div className="space-y-4">
           {active.map((l) => {
-            const b = bookById(l.bookId)!;
-            const left = daysUntil(l.dueDate);
-            const late = l.status === "Terlambat" || left < 0;
+            const b: Book = l.book ? {
+              id: String(l.book.id),
+              title: l.book.title,
+              author: l.book.author,
+              publisher: l.book.publisher || "-",
+              year: l.book.year || 2024,
+              category: l.book.category?.name || "Umum",
+              cover: l.book.coverUrl || l.book.cover || "from-forest to-forest-deep",
+              status: "Dipinjam",
+              description: l.book.description || "",
+              copies: l.book.stock || 1,
+              available: l.book.availableStock || 0,
+              rating: 4.8,
+              popularity: 90
+            } : bookById(l.bookId)!;
+
+            const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "2026-09-03";
+            const dueDateStr = l.dueDate ? String(l.dueDate).split("T")[0] : "2026-09-10";
+            const left = daysUntil(dueDateStr);
+            const late = l.status === "OVERDUE" || l.status === "Terlambat" || left < 0;
+            const statusLabel = l.status === "PENDING" ? "Pengajuan Peminjaman" : l.status === "BORROWED" ? "Dipinjam" : l.status;
+
             return (
               <Card key={l.id} className={`flex gap-4 p-4 ${late ? "border-danger/40 bg-danger/[0.03]" : ""}`}>
-                <button onClick={() => onOpen(b)} className="w-20 shrink-0"><BookCover book={b} /></button>
+                <button onClick={() => b && onOpen(b)} className="w-20 shrink-0">{b && <BookCover book={b} />}</button>
                 <div className="flex min-w-0 flex-1 flex-col justify-between">
                   <div>
-                    <button onClick={() => onOpen(b)} className="text-left font-display text-lg font-700 leading-tight hover:text-forest">{b.title}</button>
-                    <p className="text-sm text-ink-soft">{b.author}</p>
+                    <button onClick={() => b && onOpen(b)} className="text-left font-display text-lg font-700 leading-tight hover:text-forest">{b ? b.title : "Buku"}</button>
+                    <p className="text-sm text-ink-soft">{b ? b.author : "-"}</p>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
-                    <span className="text-ink-soft">Dipinjam <b className="text-ink">{formatDate(l.borrowDate)}</b></span>
-                    <span className="text-ink-soft">Kembali sebelum <b className="text-ink">{formatDate(l.dueDate)}</b></span>
+                    <span className="text-ink-soft">Dipinjam <b className="text-ink">{borrowDateStr}</b></span>
+                    <span className="text-ink-soft">Kembali sebelum <b className="text-ink">{dueDateStr}</b></span>
                   </div>
                 </div>
                 <div className="flex flex-col items-end justify-between text-right">
-                  <StatusBadge status={l.status} />
+                  <StatusBadge status={statusLabel === "Dipinjam" ? "Dipinjam" : "Tersedia"} />
                   <span className={`text-sm font-800 ${late ? "text-danger" : left <= 3 ? "text-warn" : "text-forest"}`}>
-                    {late ? `Terlambat ${Math.abs(left)} hari` : `${left} hari lagi`}
+                    {statusLabel}
                   </span>
                 </div>
               </Card>
@@ -308,7 +377,7 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
         </div>
       )}
 
-      {active.some((l) => l.status === "Terlambat" || daysUntil(l.dueDate) < 0) && (
+      {active.some((l) => l.status === "Terlambat" || l.status === "OVERDUE") && (
         <Card className="flex items-start gap-3 border-danger/30 bg-danger/[0.05] p-4">
           <Icon.alert className="mt-0.5 w-5 h-5 shrink-0 text-danger" />
           <div className="text-sm">
@@ -323,76 +392,183 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
 
 /* ---------------- History ---------------- */
 function History() {
-  const rows = LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.returnDate !== null);
+  const [historyList, setHistoryList] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getMyBorrowings().then((res) => {
+      if (res && res.borrowings) {
+        setHistoryList(res.borrowings);
+      }
+    }).catch(() => { });
+  }, []);
+
+  const rows = historyList;
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-4xl font-700">Riwayat Peminjaman</h1>
-        <p className="mt-1 text-ink-soft">Semua buku yang pernah kamu pinjam.</p>
+        <p className="mt-1 text-ink-soft">Semua riwayat pengajuan & peminjaman buku kamu di database MySQL.</p>
       </header>
 
       <Card className="overflow-hidden">
-        <div className="hidden grid-cols-[2.2fr_1fr_1fr_1fr] gap-4 border-b border-border bg-paper-2/50 px-5 py-3 text-xs font-800 uppercase tracking-wide text-ink-soft sm:grid">
+        <div className="hidden grid-cols-[2fr_1.2fr_1.2fr_1fr] gap-4 border-b border-border bg-paper-2/50 px-5 py-3 text-xs font-800 uppercase tracking-wide text-ink-soft sm:grid">
           <span>Buku</span><span>Tanggal Pinjam</span><span>Tanggal Kembali</span><span>Status</span>
         </div>
-        {rows.map((l) => {
-          const b = bookById(l.bookId)!;
-          return (
-            <div key={l.id} className="grid gap-2 border-b border-border px-5 py-4 last:border-0 sm:grid-cols-[2.2fr_1fr_1fr_1fr] sm:items-center sm:gap-4">
-              <div className="flex items-center gap-3">
-                {b.cover ? <img src={b.cover} alt="" className="h-9 w-9 rounded-lg object-cover bg-paper-2" /> : <span className="grid h-9 w-9 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs">{b.title[0]}</span>}
-                <div>
-                  <p className="font-700 leading-tight">{b.title}</p>
-                  <p className="text-xs text-ink-soft">{b.author}</p>
+
+        {rows.length === 0 ? (
+          <div className="p-10 text-center text-ink-soft">Belum ada riwayat peminjaman buku.</div>
+        ) : (
+          rows.map((l) => {
+            const bookTitle = l.book?.title || "Buku";
+            const bookAuthor = l.book?.author || "-";
+            const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "-";
+            const returnDateStr = l.returnDate ? String(l.returnDate).split("T")[0] : l.dueDate ? String(l.dueDate).split("T")[0] : "—";
+            const statusLabel = l.status === "RETURNED" ? "Dikembalikan" : l.status === "BORROWED" ? "Dipinjam" : l.status === "PENDING" ? "Tersedia" : l.status;
+
+            return (
+              <div key={l.id} className="grid gap-2 border-b border-border px-5 py-4 last:border-0 sm:grid-cols-[2fr_1.2fr_1.2fr_1fr] sm:items-center sm:gap-4">
+                <div className="flex items-center gap-3">
+                  {l.book?.coverUrl ? (
+                    <img src={l.book.coverUrl} alt={bookTitle} className="h-10 w-8 shrink-0 rounded object-cover border border-border" />
+                  ) : (
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs font-700">{bookTitle[0]}</span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-700 leading-tight truncate">{bookTitle}</p>
+                    <p className="text-xs text-ink-soft truncate">{bookAuthor}</p>
+                  </div>
                 </div>
+                <span className="text-sm text-ink-soft">{borrowDateStr}</span>
+                <span className="text-sm text-ink-soft">{returnDateStr}</span>
+                <div><StatusBadge status={statusLabel} /></div>
               </div>
-              <span className="text-sm text-ink-soft">{formatDate(l.borrowDate)}</span>
-              <span className="text-sm text-ink-soft">{l.returnDate ? formatDate(l.returnDate) : "—"}</span>
-              <div><StatusBadge status={l.status} /></div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </Card>
     </div>
   );
 }
 
 /* ---------------- Profile ---------------- */
-function Profile({ onLogout }: { onLogout: () => void }) {
-  const u = CURRENT_USER;
-  const active = LOANS.filter((l) => l.memberId === u.id && l.returnDate === null).length;
-  const total = LOANS.filter((l) => l.memberId === u.id).length;
+function Profile({ user, onLogout }: { user?: any; onLogout: () => void }) {
+  const u = user || CURRENT_USER;
+  const [myLoans, setMyLoans] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getMyBorrowings().then((res) => {
+      if (res && res.borrowings) {
+        setMyLoans(res.borrowings);
+      }
+    }).catch(() => { });
+  }, []);
+
+  const nisValue = u.nisNip || u.nim || u.idNumber || "-";
+  const roleLabel = u.role === "TEACHER" ? "Guru" : u.role === "ADMIN" ? "Admin" : "Siswa";
+
+  const activeLoansCount = myLoans.filter((l) => l.status === "BORROWED").length;
+  const returnedLoansCount = myLoans.filter((l) => l.status === "RETURNED").length;
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <h1 className="font-display text-4xl font-700">Profil</h1>
+    <div className="max-w-4xl space-y-7">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-4xl font-700">Profil Saya</h1>
+          <p className="text-ink-soft font-600 mt-1">Kelola data informasi akun dan statistik aktivitas membaca Anda.</p>
+        </div>
+        <Button variant="danger" onClick={onLogout} className="px-5">
+          <Icon.logout className="w-5 h-5" /> Keluar (Logout)
+        </Button>
+      </header>
 
-      <Card className="p-6">
-        <div className="flex items-center gap-5">
-          <div className="grid h-20 w-20 shrink-0 place-items-center rounded-full bg-forest text-3xl font-800 text-paper font-display">
-            {u.name.split(" ").map((s) => s[0]).slice(0, 2).join("")}
+      {/* Main Profile Header Card */}
+      <Card className="overflow-hidden p-0 border border-border shadow-sm">
+        <div className="bg-gradient-to-r from-forest to-forest-deep px-8 py-8 text-paper flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-5">
+            <div className="grid h-24 w-24 shrink-0 place-items-center rounded-3xl bg-white text-forest text-3xl font-900 shadow-md font-display border-4 border-white/20">
+              {(u.name || "Siswa").split(" ").map((s: string) => s[0]).slice(0, 2).join("")}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-amber text-ink px-3 py-1 text-xs font-900 uppercase tracking-wider">{roleLabel}</span>
+                <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-700">Aktif</span>
+              </div>
+              <h2 className="font-display text-3xl font-700 mt-2">{u.name || "Siswa"}</h2>
+              <p className="text-paper/80 text-sm font-600 mt-0.5">{u.email || "-"}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-display text-2xl font-700">{u.name}</h2>
-            <span className="mt-1 inline-block rounded-full bg-amber-soft px-3 py-1 text-sm font-800 text-warn">{u.role} · Kelas {u.kelas}</span>
+        </div>
+
+        {/* Stats Strip */}
+        <div className="grid grid-cols-3 border-b border-border bg-paper-2/40 divide-x divide-border">
+          <div className="p-5 text-center">
+            <p className="text-xs font-800 uppercase text-ink-soft">Total Pinjaman</p>
+            <p className="font-display text-3xl font-700 text-forest mt-1">{myLoans.length}</p>
+          </div>
+          <div className="p-5 text-center">
+            <p className="text-xs font-800 uppercase text-ink-soft">Sedang Dipinjam</p>
+            <p className="font-display text-3xl font-700 text-warn mt-1">{activeLoansCount}</p>
+          </div>
+          <div className="p-5 text-center">
+            <p className="text-xs font-800 uppercase text-ink-soft">Sudah Dikembalikan</p>
+            <p className="font-display text-3xl font-700 text-ok mt-1">{returnedLoansCount}</p>
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-3 gap-3">
-          <MiniStat label="Sedang dipinjam" value={active} />
-          <MiniStat label="Total pinjaman" value={total} />
-          <MiniStat label="Poin baca" value={240} />
-        </div>
+        {/* Profile Info Details Form */}
+        <div className="p-8 space-y-6">
+          <h3 className="font-display text-xl font-700 text-ink">Informasi Akun & Kontak</h3>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Nama Lengkap"><input className={inputCls} defaultValue={u.name} disabled /></Field>
-          <Field label="NIS / NIP"><input className={inputCls} defaultValue={u.idNumber} disabled /></Field>
-          <Field label="Kelas / Status"><input className={inputCls} defaultValue={u.kelas} disabled /></Field>
-          <Field label="Email"><input className={inputCls} defaultValue={u.email} disabled /></Field>
-        </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field label="Nama Lengkap">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={u.name || ""}
+                disabled
+              />
+            </Field>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Button variant="danger" onClick={onLogout} className="ml-auto"><Icon.logout className="w-5 h-5" /> Logout</Button>
+            <Field label="NIS / NIP / NIM">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={nisValue}
+                disabled
+              />
+            </Field>
+
+            <Field label="Email Utama">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={u.email || "-"}
+                disabled
+              />
+            </Field>
+
+            <Field label="No HP / WhatsApp">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={u.phone || "-"}
+                disabled
+              />
+            </Field>
+
+            <Field label="Kelas / Jurusan">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={u.kelas || "-"}
+                disabled
+              />
+            </Field>
+
+            <Field label="Peran Hak Akses">
+              <input
+                className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
+                value={roleLabel}
+                disabled
+              />
+            </Field>
+          </div>
         </div>
       </Card>
     </div>

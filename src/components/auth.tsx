@@ -1,56 +1,94 @@
-import { useState } from "react";
-import { Logo, Button, Field, inputCls, Icon } from "./ui";
+import { useState, useEffect } from "react";
+import { Logo, Button, Field, inputCls } from "./ui";
 import { CATEGORIES } from "../lib/data";
+import { api, setAuthToken } from "../lib/api";
 
-type Mode = "login" | "staff";
+type Mode = "login" | "register" | "staff";
 
-export default function AuthScreen({ onEnter }: { onEnter: (role: "student" | "admin") => void }) {
-  const [mode, setMode] = useState<Mode>("login");
+export default function AuthScreen({
+  initialMode = "login",
+  onEnter,
+  onBackLanding,
+}: {
+  initialMode?: "student" | "staff" | "login";
+  onEnter: (role: "student" | "admin", user: any) => void;
+  onBackLanding?: () => void;
+}) {
+  const [mode, setMode] = useState<Mode>(initialMode === "staff" ? "staff" : "login");
+
+  const [booksCount, setBooksCount] = useState(0);
+  const [membersCount, setMembersCount] = useState(0);
+  const [categoriesCount, setCategoriesCount] = useState(0);
+
+  useEffect(() => {
+    api.getStats().then((res) => {
+      if (res) {
+        setBooksCount(res.booksCount || 0);
+        setMembersCount(res.membersCount || 0);
+        setCategoriesCount(res.categoriesCount || 0);
+      }
+    }).catch(() => {});
+  }, []);
 
   return (
-    <div className="min-h-full grid lg:grid-cols-[1.05fr_1fr]">
-      {/* Left brand panel */}
-      <aside className="relative hidden overflow-hidden bg-forest text-paper lg:flex lg:flex-col lg:justify-between p-12">
+    <div className="min-h-screen w-full flex-1 grid lg:grid-cols-[1.05fr_1fr] bg-paper">
+      {/* Left brand panel - Original UI */}
+      <aside className="relative hidden overflow-hidden bg-forest text-paper lg:flex lg:flex-col lg:justify-between p-12 min-h-screen">
         <div
           className="pointer-events-none absolute inset-0 opacity-[0.13]"
-          style={{ backgroundImage: "radial-gradient(circle at 15% 15%, #fff 0 2px, transparent 2px), radial-gradient(circle at 65% 60%, #fff 0 2px, transparent 2px)", backgroundSize: "70px 70px" }}
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 15% 15%, #fff 0 2px, transparent 2px), radial-gradient(circle at 65% 60%, #fff 0 2px, transparent 2px)",
+            backgroundSize: "70px 70px",
+          }}
         />
-        <Logo size={52} />
+
+
+
         <div className="relative">
           <p className="font-display text-[2.9rem] leading-[1.05] font-700">
             Setiap buku<br />adalah petualangan<br /><span className="text-amber">baru.</span>
           </p>
           <p className="mt-5 max-w-md text-paper/80 text-lg">
-            Jelajahi 40.000+ buku anak, dongeng nusantara, dan ensiklopedia. Pinjam, baca, dan tumbuh bersama Kancil.
+            Jelajahi Buku Dongeng Nusantara, Mata Pelajaran, Sains & Alam, Sejarah. Pinjam, baca, dan tumbuh bersama Kancil.
           </p>
           <div className="mt-8 flex flex-wrap gap-2">
-            {CATEGORIES.slice(0, 5).map((c) => (
+            {CATEGORIES.map((c) => (
               <span key={c.name} className="rounded-full bg-paper/12 px-3 py-1.5 text-sm font-600">
-                {c.emoji} {c.name}
+                {c.name}
               </span>
             ))}
           </div>
         </div>
+
         <div className="relative flex items-center gap-6 text-sm">
-          <Stat n="40.2rb" l="Koleksi buku" />
+          <Stat n={String(booksCount)} l="Koleksi buku" />
           <span className="h-8 w-px bg-paper/25" />
-          <Stat n="1.180" l="Anggota aktif" />
+          <Stat n={String(membersCount)} l="Anggota aktif" />
           <span className="h-8 w-px bg-paper/25" />
-          <Stat n="12" l="Kategori" />
+          <Stat n={String(categoriesCount)} l="Kategori" />
         </div>
       </aside>
 
-      {/* Right form panel */}
+      {/* Right form panel - Original UI */}
       <main className="flex items-center justify-center p-6 sm:p-10">
-        <div className="w-full max-w-md">
-          <div className="mb-8 lg:hidden">
-            <Logo size={46} />
-          </div>
-
-          {mode !== "staff" ? (
-            <StudentForms setMode={setMode} onEnter={() => onEnter("student")} />
+        <div className="w-full max-w-md space-y-6">
+          {mode === "staff" ? (
+            <StaffForm setMode={setMode} onEnter={onEnter} />
           ) : (
-            <StaffForm setMode={setMode} onEnter={() => onEnter("admin")} />
+            <StudentForms mode={mode} setMode={setMode} onEnter={onEnter} />
+          )}
+
+          {onBackLanding && (
+            <div className="pt-4 text-center border-t border-border/60">
+              <button
+                type="button"
+                onClick={onBackLanding}
+                className="font-700 text-xs text-ink-soft hover:text-forest transition cursor-pointer"
+              >
+                ← Kembali ke Halaman Utama
+              </button>
+            </div>
           )}
         </div>
       </main>
@@ -67,66 +105,300 @@ function Stat({ n, l }: { n: string; l: string }) {
   );
 }
 
-function StudentForms({ setMode, onEnter }: { setMode: (m: Mode) => void; onEnter: () => void }) {
-  return (
-    <div>
-      <h1 className="mt-6 font-display text-3xl font-700">Halo lagi! 👋</h1>
-      <p className="mt-1 text-ink-soft">
-        Masuk untuk melanjutkan membaca.
-      </p>
+function StudentForms({
+  mode,
+  setMode,
+  onEnter,
+}: {
+  mode: Mode;
+  setMode: (m: Mode) => void;
+  onEnter: (role: "student" | "admin", user: any) => void;
+}) {
+  // Login States
+  const [loginEmail, setLoginEmail] = useState("siswa@kancil.com");
+  const [loginPassword, setLoginPassword] = useState("student123");
+  const [rememberMe, setRememberMe] = useState(true);
 
-      <form className="mt-7 space-y-4" onSubmit={(e) => { e.preventDefault(); onEnter(); }}>
-        <Field label="Email atau NIS">
-          <input className={inputCls} placeholder="kirana@kancil.sch.id" defaultValue="kirana@kancil.sch.id" />
-        </Field>
-        <Field label="Kata Sandi">
-          <input type="password" className={inputCls} placeholder="••••••••" defaultValue="kancilhebat" />
-        </Field>
+  // Register States
+  const [regName, setRegName] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regNim, setRegNim] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regRole, setRegRole] = useState<"STUDENT" | "TEACHER">("STUDENT");
 
-        <div className="flex items-center justify-between text-sm">
-          <label className="flex items-center gap-2 text-ink-soft font-600">
-            <input type="checkbox" className="accent-forest w-4 h-4" defaultChecked /> Ingat saya
-          </label>
-          <button type="button" className="font-700 text-forest hover:underline">Lupa sandi?</button>
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await api.login({ email: loginEmail, password: loginPassword });
+      setAuthToken(res.token);
+      onEnter(res.user.role === "ADMIN" ? "admin" : "student", res.user);
+    } catch (err: any) {
+      setError(err.message || "Email/NIS atau password salah.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await api.register({
+        name: regName,
+        email: regEmail,
+        password: regPassword,
+        nim: regNim,
+        phone: regPhone,
+        role: regRole,
+      });
+      setAuthToken(res.token);
+      onEnter("student", res.user);
+    } catch (err: any) {
+      setError(err.message || "Registrasi gagal.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (mode === "register") {
+    return (
+      <form onSubmit={handleRegister} className="space-y-5">
+        <div>
+          <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
+            <span>Daftar Akun Baru</span> <span className="text-2xl">✨</span>
+          </h2>
+          <p className="text-sm text-ink-soft mt-1">Daftarkan akun Siswa atau Guru di perpustakaan Kancil.</p>
         </div>
 
-        <Button type="submit" full size="lg">
-          Masuk <Icon.arrow className="w-5 h-5" />
-        </Button>
-      </form>
+        {error && <div className="p-3.5 rounded-2xl bg-danger/10 text-danger text-sm font-700">{error}</div>}
 
-      <div className="mt-8 border-t border-border pt-5 text-center">
-        <button className="inline-flex items-center gap-2 text-sm font-700 text-ink-soft hover:text-forest" onClick={() => setMode("staff")}>
-          <Icon.building className="w-4 h-4" /> Masuk sebagai Petugas / Admin
+        <div>
+          <label className="block text-sm font-700 text-ink mb-1.5">Nama Lengkap</label>
+          <input
+            className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+            value={regName}
+            onChange={(e) => setRegName(e.target.value)}
+            required
+            placeholder="Ahmad Rizky"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-700 text-ink mb-1.5">Email</label>
+            <input
+              type="email"
+              className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+              value={regEmail}
+              onChange={(e) => setRegEmail(e.target.value)}
+              required
+              placeholder="siswa@kancil.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-700 text-ink mb-1.5">Kata Sandi</label>
+            <input
+              type="password"
+              className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+              value={regPassword}
+              onChange={(e) => setRegPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-700 text-ink mb-1.5">NIS / NIP</label>
+            <input
+              className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+              value={regNim}
+              onChange={(e) => setRegNim(e.target.value)}
+              placeholder="2026101"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-700 text-ink mb-1.5">No HP</label>
+            <input
+              className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+              value={regPhone}
+              onChange={(e) => setRegPhone(e.target.value)}
+              placeholder="08123456789"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-700 text-ink mb-1.5">Peran</label>
+          <select
+            value={regRole}
+            onChange={(e) => setRegRole(e.target.value as "STUDENT" | "TEACHER")}
+            className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+          >
+            <option value="STUDENT">Siswa (STUDENT)</option>
+            <option value="TEACHER">Guru (TEACHER)</option>
+          </select>
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-full bg-[#009BF2] hover:bg-[#0086d4] text-white py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <span>{loading ? "Mendaftar..." : "Daftar Akun Anggota"}</span>
+          <span className="text-lg">➔</span>
         </button>
-      </div>
-    </div>
-  );
-}
 
-function StaffForm({ setMode, onEnter }: { setMode: (m: Mode) => void; onEnter: () => void }) {
+        <p className="text-center text-xs font-700 text-ink-soft pt-1">
+          Sudah punya akun?{" "}
+          <button type="button" onClick={() => setMode("login")} className="text-[#009BF2] hover:underline cursor-pointer font-800">
+            Login di sini
+          </button>
+        </p>
+      </form>
+    );
+  }
+
   return (
-    <div>
-      <div className="inline-flex items-center gap-2 rounded-full bg-amber-soft px-3 py-1.5 text-sm font-800 text-warn">
-        <Icon.building className="w-4 h-4" /> Portal Petugas
+    <form onSubmit={handleLogin} className="space-y-5">
+      <div>
+        <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
+          <span>Halo lagi!</span> <span className="text-2xl">👋</span>
+        </h2>
+        <p className="text-sm text-ink-soft mt-1">Masuk untuk melanjutkan membaca.</p>
       </div>
-      <h1 className="mt-5 font-display text-3xl font-700">Login Petugas</h1>
-      <p className="mt-1 text-ink-soft">Kelola koleksi, anggota, dan transaksi perpustakaan.</p>
 
-      <form className="mt-7 space-y-4" onSubmit={(e) => { e.preventDefault(); onEnter(); }}>
-        <Field label="Username / Email"><input className={inputCls} defaultValue="admin@kancil.sch.id" /></Field>
-        <Field label="Kata Sandi"><input type="password" className={inputCls} defaultValue="pustakawan" /></Field>
-        <Button type="submit" full size="lg" variant="secondary">
-          Masuk ke Dashboard <Icon.arrow className="w-5 h-5" />
-        </Button>
-      </form>
+      {error && <div className="p-3.5 rounded-2xl bg-danger/10 text-danger text-sm font-700">{error}</div>}
 
-      <div className="mt-8 border-t border-border pt-5 text-center">
-        <button className="inline-flex items-center gap-2 text-sm font-700 text-ink-soft hover:text-forest" onClick={() => setMode("login")}>
-          <Icon.back className="w-4 h-4" /> Kembali ke login siswa/guru
+      <div>
+        <label className="block text-sm font-700 text-ink mb-1.5">Email atau NIS</label>
+        <input
+          type="text"
+          className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+          value={loginEmail}
+          onChange={(e) => setLoginEmail(e.target.value)}
+          placeholder="kirana@kancil.sch.id"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-700 text-ink mb-1.5">Kata Sandi</label>
+        <input
+          type="password"
+          className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+          value={loginPassword}
+          onChange={(e) => setLoginPassword(e.target.value)}
+          placeholder="••••••••"
+          required
+        />
+      </div>
+
+      {/* Checkbox Ingat saya & Lupa sandi */}
+      <div className="flex items-center justify-between pt-1">
+        <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-ink-soft select-none">
+          <input
+            type="checkbox"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.target.checked)}
+            className="h-4 w-4 rounded border-border text-[#009BF2] focus:ring-[#009BF2]"
+          />
+          <span>Ingat saya</span>
+        </label>
+
+        <button type="button" onClick={() => alert("Silakan hubungi petugas perpustakaan sekolah untuk mereset kata sandi Anda.")} className="text-xs font-800 text-[#009BF2] hover:underline cursor-pointer">
+          Lupa sandi?
         </button>
       </div>
-    </div>
+
+      {/* Main Login Button matching screenshot */}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-full bg-[#009BF2] hover:bg-[#0086d4] text-white py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+      >
+        <span>{loading ? "Memproses..." : "Masuk"}</span>
+        <span className="text-lg">➔</span>
+      </button>
+    </form>
   );
 }
 
+function StaffForm({ setMode, onEnter }: { setMode: (m: Mode) => void; onEnter: (role: "student" | "admin", user: any) => void }) {
+  const [email, setEmail] = useState("admin@kancil.com");
+  const [password, setPassword] = useState("admin123");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await api.login({ email, password });
+      setAuthToken(res.token);
+      onEnter("admin", res.user);
+    } catch (err: any) {
+      setError(err.message || "Email atau password petugas salah.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleLogin} className="space-y-5">
+      <div>
+        <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
+          <span>Halo Petugas!</span> <span className="text-2xl">🛡️</span>
+        </h2>
+        <p className="text-sm text-ink-soft mt-1">Masuk untuk mengelola administrasi perpustakaan.</p>
+      </div>
+
+      {error && <div className="p-3.5 rounded-2xl bg-danger/10 text-danger text-sm font-700">{error}</div>}
+
+      <div>
+        <label className="block text-sm font-700 text-ink mb-1.5">Email Petugas Admin</label>
+        <input
+          type="email"
+          className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="admin@kancil.com"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-700 text-ink mb-1.5">Kata Sandi</label>
+        <input
+          type="password"
+          className="w-full rounded-full px-5 py-3 border border-border bg-white focus:border-[#009BF2] focus:ring-2 focus:ring-[#009BF2]/20 outline-none font-600 text-sm transition"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          required
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full rounded-full bg-[#A7D02C] hover:bg-[#96bd22] text-[#1D3A05] py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+      >
+        <span>{loading ? "Memproses..." : "Masuk sebagai Admin"}</span>
+        <span className="text-lg">➔</span>
+      </button>
+    </form>
+  );
+}
