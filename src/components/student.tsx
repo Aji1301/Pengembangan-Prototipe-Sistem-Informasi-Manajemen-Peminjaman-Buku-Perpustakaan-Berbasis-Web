@@ -234,7 +234,7 @@ function Catalog({ booksList, onOpen, query, setQuery, category, setCategory }: 
       </div>
 
       {results.length === 0 ? (
-        <EmptyState emoji="🔍" title="Buku tidak ditemukan" desc="Coba kata kunci atau kategori yang berbeda." />
+        <EmptyState emoji="" title="Buku tidak ditemukan" desc="Coba kata kunci atau kategori yang berbeda." />
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-6">
           {results.map((b) => (

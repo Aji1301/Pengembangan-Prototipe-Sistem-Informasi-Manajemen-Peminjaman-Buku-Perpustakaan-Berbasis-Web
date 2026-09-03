@@ -115,7 +115,7 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
               {/* Floating Bottom Badge */}
               <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-2.5 rounded-2xl shadow-xl border border-border flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-[#009BF2] grid place-items-center text-white text-xs font-900">
-                  🦌
+                  
                 </div>
                 <div>
                   <p className="font-800 text-xs text-ink leading-tight">Halo, aku Kancil!</p>
@@ -174,7 +174,7 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
               className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-800 text-ink hover:bg-paper-2 transition cursor-pointer"
             >
               <span>Masuk untuk meminjam</span>
-              <span className="text-lg">➔</span>
+              <span className="text-lg"></span>
             </button>
           </div>
 
@@ -249,10 +249,10 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
           <div className="space-y-3">
             <h4 className="font-display font-800 text-base text-white">Perpustakaan</h4>
             <p className="text-white/80 text-sm flex items-center gap-2">
-              <span>📍</span> Jl. Cendekia No. 3, Lt. 2 Gedung Utama
+              <span></span> Jl. Cendekia No. 3, Lt. 2 Gedung Utama
             </p>
             <p className="text-white/80 text-sm flex items-center gap-2">
-              <span>🕒</span> Senin - Jumat : 07.00 - 15.00 WIB
+              <span></span> Senin - Jumat : 07.00 - 15.00 WIB
             </p>
           </div>
 
@@ -260,10 +260,10 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
           <div className="space-y-3">
             <h4 className="font-display font-800 text-base text-white">Kontak</h4>
             <p className="text-white/80 text-sm flex items-center gap-2">
-              <span>✉️</span> perpus@kancil.sch.id
+              <span></span> perpus@kancil.sch.id
             </p>
             <p className="text-white/80 text-sm flex items-center gap-2">
-              <span>💬</span> WhatsApp Admin: 0812-3003-0303
+              <span></span> WhatsApp Admin: 0812-3003-0303
             </p>
           </div>
         </div>

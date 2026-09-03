@@ -52,17 +52,17 @@ export type Loan = {
   status: LoanStatus;
 };
 
-export const CATEGORIES: { name: string; emoji: string }[] = [
-  { name: "Fiksi", emoji: "📖" },
-  { name: "Non-Fiksi", emoji: "📚" },
-  { name: "Sains", emoji: "🔬" },
-  { name: "Sejarah", emoji: "🏛️" },
-  { name: "Matematika", emoji: "🔢" },
-  { name: "Bahasa", emoji: "🗣️" },
-  { name: "Agama", emoji: "🕌" },
-  { name: "Seni & Budaya", emoji: "🎨" },
-  { name: "Teknologi", emoji: "💻" },
-  { name: "Ensiklopedia", emoji: "📕" },
+export const CATEGORIES: { name: string }[] = [
+  { name: "Fiksi" },
+  { name: "Non-Fiksi" },
+  { name: "Sains" },
+  { name: "Sejarah" },
+  { name: "Matematika" },
+  { name: "Bahasa" },
+  { name: "Agama" },
+  { name: "Seni & Budaya" },
+  { name: "Teknologi" },
+  { name: "Ensiklopedia" },
 ];
 
 export const BOOKS: Book[] = [];

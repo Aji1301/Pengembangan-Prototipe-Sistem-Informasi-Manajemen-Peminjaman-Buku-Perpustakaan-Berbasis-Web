@@ -174,7 +174,7 @@ function StudentForms({
       <form onSubmit={handleRegister} className="space-y-5">
         <div>
           <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
-            <span>Daftar Akun Baru</span> <span className="text-2xl">✨</span>
+            <span>Daftar Akun Baru</span> <span className="text-2xl"></span>
           </h2>
           <p className="text-sm text-ink-soft mt-1">Daftarkan akun Siswa atau Guru di perpustakaan Kancil.</p>
         </div>
@@ -256,7 +256,7 @@ function StudentForms({
           className="w-full rounded-full bg-[#009BF2] hover:bg-[#0086d4] text-white py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
         >
           <span>{loading ? "Mendaftar..." : "Daftar Akun Anggota"}</span>
-          <span className="text-lg">➔</span>
+          <span className="text-lg"></span>
         </button>
 
         <p className="text-center text-xs font-700 text-ink-soft pt-1">
@@ -273,7 +273,7 @@ function StudentForms({
     <form onSubmit={handleLogin} className="space-y-5">
       <div>
         <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
-          <span>Halo lagi!</span> <span className="text-2xl">👋</span>
+          <span>Halo lagi!</span> <span className="text-2xl"></span>
         </h2>
         <p className="text-sm text-ink-soft mt-1">Masuk untuk melanjutkan membaca.</p>
       </div>
@@ -328,7 +328,7 @@ function StudentForms({
         className="w-full rounded-full bg-[#009BF2] hover:bg-[#0086d4] text-white py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
       >
         <span>{loading ? "Memproses..." : "Masuk"}</span>
-        <span className="text-lg">➔</span>
+        <span className="text-lg"></span>
       </button>
     </form>
   );
@@ -360,7 +360,7 @@ function StaffForm({ setMode, onEnter }: { setMode: (m: Mode) => void; onEnter: 
     <form onSubmit={handleLogin} className="space-y-5">
       <div>
         <h2 className="font-display text-3xl font-800 text-ink flex items-center gap-2">
-          <span>Halo Petugas!</span> <span className="text-2xl">🛡️</span>
+          <span>Halo Petugas!</span> <span className="text-2xl"></span>
         </h2>
         <p className="text-sm text-ink-soft mt-1">Masuk untuk mengelola administrasi perpustakaan.</p>
       </div>
@@ -397,7 +397,7 @@ function StaffForm({ setMode, onEnter }: { setMode: (m: Mode) => void; onEnter: 
         className="w-full rounded-full bg-[#A7D02C] hover:bg-[#96bd22] text-[#1D3A05] py-3.5 px-6 font-800 text-base shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
       >
         <span>{loading ? "Memproses..." : "Masuk sebagai Admin"}</span>
-        <span className="text-lg">➔</span>
+        <span className="text-lg"></span>
       </button>
     </form>
   );

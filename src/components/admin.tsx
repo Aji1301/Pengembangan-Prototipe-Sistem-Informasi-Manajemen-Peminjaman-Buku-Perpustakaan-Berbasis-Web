@@ -309,10 +309,8 @@ function BooksManager() {
         </select>
       </div>
 
-      {/* Category Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {filterCategories.map((c) => {
-          const emoji = CATEGORIES.find((catItem) => catItem.name === c)?.emoji || "";
           const active = cat === c;
           return (
             <button
@@ -323,7 +321,7 @@ function BooksManager() {
                 : "border border-border bg-white text-ink-soft hover:border-forest hover:text-forest"
                 }`}
             >
-              <span>{c === "Semua" ? "" : emoji}</span> <span>{c}</span>
+              <span>{c}</span>
             </button>
           );
         })}
@@ -366,7 +364,7 @@ function BooksManager() {
       </Card>
 
       {(showAdd || editingBook) && (
-        <Modal title={editingBook ? "Edit Data Buku" : "✨ Tambah Buku Baru ke Katalog"} onClose={closeAdd}>
+        <Modal title={editingBook ? "Edit Data Buku" : "Tambah Buku Baru ke Katalog"} onClose={closeAdd}>
           <div className="space-y-5">
             {/* Cover Upload Area */}
             <div className="rounded-2xl border-2 border-dashed border-forest/30 bg-forest-soft/30 p-4 transition-all hover:border-forest hover:bg-forest-soft/50">
@@ -434,7 +432,7 @@ function BooksManager() {
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c.name} value={c.name}>
-                        {c.emoji} {c.name}
+                        {c.name}
                       </option>
                     ))}
                   </select>
@@ -612,7 +610,7 @@ function MembersManager() {
       </Card>
 
       {showAdd && (
-        <Modal title="👤 Tambah Anggota Baru (Siswa / Guru)" onClose={() => setShowAdd(false)}>
+        <Modal title="Tambah Anggota Baru (Siswa / Guru)" onClose={() => setShowAdd(false)}>
           <div className="space-y-4">
             <Field label="Nama Lengkap">
               <input
@@ -940,7 +938,7 @@ function ReturnsManager({ borrowings = [], onUpdateStatus }: { borrowings?: any[
       <Card className="overflow-hidden">
         <h3 className="p-4 font-700 text-lg border-b border-border bg-paper-2/40">Buku Yang Sedang Dipinjam (Menunggu Pengembalian)</h3>
         <TableHead cols={["Peminjam", "Buku", "Tgl Pinjam", "Batas Kembali", "Status", "Aksi"]} widths="grid-cols-[1.3fr_1.6fr_1fr_1fr_1fr_1.1fr]" />
-        {activeLoans.length === 0 && <div className="p-8 text-center text-ink-soft">Semua buku yang dipinjam telah dikembalikan ke rak. 🎉</div>}
+        {activeLoans.length === 0 && <div className="p-8 text-center text-ink-soft">Semua buku yang dipinjam telah dikembalikan ke rak. </div>}
         {activeLoans.map((l) => {
           const userName = l.user?.name || "Siswa";
           const userNim = l.user?.nim || "NIS";
