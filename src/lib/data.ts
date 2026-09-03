@@ -39,7 +39,12 @@ export type Loan = {
   status: LoanStatus;
 };
 
-export const CATEGORIES: { name: string; emoji: string }[] = [];
+export const CATEGORIES: { name: string; emoji: string }[] = [
+  { name: "Mata Pelajaran", emoji: "" },
+  { name: "Dongeng Nusantara", emoji: "" },
+  { name: "Sains dan Alam", emoji: "" },
+  { name: "Sejarah", emoji: "" },
+];
 
 const covers = [
   "from-forest to-forest-deep",

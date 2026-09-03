@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 1. KATEGORI
+model Category {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique
+  description String?
+  books       Book[]
+}
+
+// 2. BUKU
+model Book {
+  id             Int         @id @default(autoincrement())
+  title          String
+  author         String
+  publisher      String?
+  year           Int?
+  categoryId     Int?
+  category       Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  description    String?     @db.Text
+  coverUrl       String?     @db.LongText
+  stock          Int         @default(1)
+  availableStock Int         @default(1)
+  borrowings     Borrowing[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+// 3. ANGGOTA (Siswa & Guru)
+model Member {
+  id         Int         @id @default(autoincrement())
+  nisNip     String?     @unique
+  name       String
+  kelas      String?
+  email      String      @unique
+  password   String
+  phone      String?
+  role       String      @default("STUDENT") // STUDENT | TEACHER
+  borrowings Borrowing[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// 4. PETUGAS (Admin)
+model Petugas {
+  id         Int         @id @default(autoincrement())
+  name       String
+  email      String      @unique
+  password   String
+  phone      String?
+  borrowings Borrowing[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// 5. TRANSAKSI PEMINJAMAN
+model Borrowing {
+  id          Int       @id @default(autoincrement())
+  memberId    Int
+  member      Member    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  bookId      Int
+  book        Book      @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  petugasId   Int?
+  petugas     Petugas?  @relation(fields: [petugasId], references: [id], onDelete: SetNull)
+  borrowDate  DateTime  @default(now())
+  dueDate     DateTime
+  returnDate  DateTime?
+  status      String    @default("PENDING") // PENDING | BORROWED | RETURNED | OVERDUE | REJECTED
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}

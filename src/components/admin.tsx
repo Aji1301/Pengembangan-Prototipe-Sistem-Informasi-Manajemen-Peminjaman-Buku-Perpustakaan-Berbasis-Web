@@ -1,23 +1,47 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   BOOKS, MEMBERS, LOANS, CATEGORIES, bookById, memberById,
   formatDate, daysUntil,
 } from "../lib/data";
 import { Logo, Icon, Button, Card, StatusBadge, inputCls, Field } from "./ui";
+import { api } from "../lib/api";
 
-type View = "dashboard" | "books" | "members" | "loans" | "returns" | "reports";
+type View = "dashboard" | "books" | "members" | "admins" | "loans" | "returns" | "reports";
 
 const NAV: { id: View; label: string; icon: keyof typeof Icon }[] = [
   { id: "dashboard", label: "Dashboard", icon: "chart" },
   { id: "books", label: "Data Buku", icon: "books" },
   { id: "members", label: "Data Anggota", icon: "users" },
+  { id: "admins", label: "Data Admin", icon: "user" },
   { id: "loans", label: "Peminjaman", icon: "swap" },
   { id: "returns", label: "Pengembalian", icon: "refresh" },
   { id: "reports", label: "Laporan", icon: "download" },
 ];
 
-export default function AdminApp({ onLogout }: { onLogout: () => void }) {
+export default function AdminApp({ user, onLogout }: { user?: any; onLogout: () => void }) {
   const [view, setView] = useState<View>("dashboard");
+  const [borrowings, setBorrowings] = useState<any[]>([]);
+
+  const fetchBorrowings = () => {
+    api.getAllBorrowings().then((res) => {
+      if (res && res.borrowings) {
+        setBorrowings(res.borrowings);
+      }
+    }).catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchBorrowings();
+  }, []);
+
+  const handleUpdateStatus = async (id: number, status: string) => {
+    try {
+      await api.updateBorrowStatus(id, status);
+      fetchBorrowings();
+    } catch (err: any) {
+      console.error(err);
+    }
+  };
   const active = view;
 
   return (
@@ -56,12 +80,13 @@ export default function AdminApp({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 lg:py-9">
-          {view === "dashboard" && <Dashboard goto={setView} />}
+          {view === "dashboard" && <Dashboard borrowings={borrowings} onUpdateStatus={handleUpdateStatus} goto={setView} />}
           {view === "books" && <BooksManager />}
           {view === "members" && <MembersManager />}
-          {view === "loans" && <LoansManager />}
-          {view === "returns" && <ReturnsManager />}
-          {view === "reports" && <Reports />}
+          {view === "admins" && <AdminManager />}
+          {view === "loans" && <LoansManager borrowings={borrowings} onUpdateStatus={handleUpdateStatus} />}
+          {view === "returns" && <ReturnsManager borrowings={borrowings} onUpdateStatus={handleUpdateStatus} />}
+          {view === "reports" && <Reports borrowings={borrowings} />}
         </div>
       </div>
     </div>
@@ -69,41 +94,27 @@ export default function AdminApp({ onLogout }: { onLogout: () => void }) {
 }
 
 /* ---------------- Dashboard ---------------- */
-function Dashboard({ goto }: { goto: (v: View) => void }) {
-  const totalBooks = BOOKS.reduce((s, b) => s + b.copies, 0);
-  const available = BOOKS.reduce((s, b) => s + b.available, 0);
-  const borrowed = totalBooks - available;
-  const activeLoans = LOANS.filter((l) => l.returnDate === null);
-  const late = activeLoans.filter((l) => l.status === "Terlambat" || daysUntil(l.dueDate) < 0);
+function Dashboard({ borrowings = [], onUpdateStatus, goto }: { borrowings?: any[]; onUpdateStatus: (id: number, status: string) => void; goto: (v: View) => void }) {
+  const pendingLoans = borrowings.filter((l) => l.status === "PENDING");
+  const activeLoans = borrowings.filter((l) => l.status === "BORROWED");
 
   const stats = [
-    { label: "Total Buku", value: totalBooks, sub: `${BOOKS.length} judul`, icon: "books" as const, tone: "forest" },
-    { label: "Buku Tersedia", value: available, sub: "siap dipinjam", icon: "check" as const, tone: "ok" },
-    { label: "Sedang Dipinjam", value: borrowed, sub: `${activeLoans.length} transaksi`, icon: "swap" as const, tone: "amber" },
-    { label: "Total Anggota", value: MEMBERS.length, sub: "siswa & guru", icon: "users" as const, tone: "sky" },
-    { label: "Total Peminjaman", value: LOANS.length, sub: "sepanjang waktu", icon: "clock" as const, tone: "forest" },
-    { label: "Keterlambatan", value: late.length, sub: "perlu ditindak", icon: "alert" as const, tone: "danger" },
+    { label: "Pengajuan Menunggu", value: pendingLoans.length, sub: "perlu konfirmasi admin", icon: "alert" as const, tone: "amber" },
+    { label: "Sedang Dipinjam", value: activeLoans.length, sub: "transaksi aktif", icon: "swap" as const, tone: "forest" },
+    { label: "Total Peminjaman", value: borrowings.length, sub: "di Perpustakaan", icon: "clock" as const, tone: "ok" },
   ];
-
-  // popularity per category for the simple bar chart
-  const perCat = CATEGORIES.map((c) => ({
-    name: c.name,
-    emoji: c.emoji,
-    count: LOANS.filter((l) => bookById(l.bookId)?.category === c.name).length,
-  })).filter((c) => c.count > 0).sort((a, b) => b.count - a.count);
-  const maxCat = Math.max(...perCat.map((c) => c.count), 1);
 
   return (
     <div className="space-y-7">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-4xl font-700">Dashboard</h1>
-          <p className="mt-1 text-ink-soft">Ringkasan aktivitas Perpustakaan KANCIL · Sabtu, 30 Agustus 2026.</p>
+          <h1 className="font-display text-4xl font-700">Dashboard Admin</h1>
+          <p className="mt-1 text-ink-soft">Ringkasan aktivitas Perpustakaan KANCIL & Konfirmasi Peminjaman.</p>
         </div>
-        <Button onClick={() => goto("loans")}><Icon.plus className="w-5 h-5" /> Peminjaman Baru</Button>
+        <Button onClick={() => goto("loans")}><Icon.plus className="w-5 h-5" /> Kelola Semua Peminjaman</Button>
       </header>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {stats.map((s) => {
           const IconC = Icon[s.icon];
           const tones: Record<string, string> = {
@@ -123,45 +134,44 @@ function Dashboard({ goto }: { goto: (v: View) => void }) {
         })}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.5fr_1fr]">
-        <Card className="p-6">
-          <h3 className="font-display text-xl font-700">Peminjaman per Kategori</h3>
-          <div className="mt-5 space-y-3">
-            {perCat.map((c) => (
-              <div key={c.name} className="flex items-center gap-3">
-                <span className="w-40 shrink-0 truncate text-sm font-700">{c.emoji} {c.name}</span>
-                <div className="h-3 flex-1 overflow-hidden rounded-full bg-paper-2">
-                  <div className="h-full rounded-full bg-forest transition-all" style={{ width: `${(c.count / maxCat) * 100}%` }} />
+      {/* Permohonan Menunggu Konfirmasi */}
+      <Card className="p-6 border-amber/30 bg-amber-soft/20">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-display text-xl font-700 flex items-center gap-2">
+              Pengajuan Peminjaman Menunggu Konfirmasi ({pendingLoans.length})
+            </h3>
+            <p className="text-sm text-ink-soft">Konfirmasi pengajuan peminjaman dari siswa di bawah ini.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => goto("loans")}>Lihat Semua Peminjaman</Button>
+        </div>
+
+        {pendingLoans.length === 0 ? (
+          <div className="p-6 text-center text-ink-soft text-sm bg-white/60 rounded-xl border border-dashed border-border">
+            Belum ada pengajuan peminjaman baru yang perlu dikonfirmasi.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pendingLoans.map((l) => (
+              <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-border shadow-sm">
+                <div>
+                  <p className="font-700 text-ink">{l.user?.name || "Siswa"} <span className="text-xs text-ink-soft">({l.user?.email || "Email"})</span></p>
+                  <p className="text-sm text-forest font-600">Buku: {l.book?.title || "Buku"}</p>
+                  <p className="text-xs text-ink-soft">Tanggal Pengajuan: {l.borrowDate ? String(l.borrowDate).split("T")[0] : "Hari ini"}</p>
                 </div>
-                <span className="w-6 text-right text-sm font-800">{c.count}</span>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" onClick={() => onUpdateStatus(l.id, "BORROWED")}>
+                    <Icon.check className="w-4 h-4" /> Setujui Peminjaman
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={() => onUpdateStatus(l.id, "REJECTED")}>
+                    Tolak
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-display text-xl font-700">Perlu Perhatian</h3>
-          <div className="mt-4 space-y-3">
-            {late.length === 0 && <p className="text-sm text-ink-soft">Tidak ada keterlambatan. 🎉</p>}
-            {late.map((l) => {
-              const b = bookById(l.bookId)!;
-              const m = memberById(l.memberId)!;
-              return (
-                <div key={l.id} className="flex items-center gap-3 rounded-xl bg-danger/[0.06] p-3">
-                  {b.cover ? <img src={b.cover} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover bg-paper-2" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs">{b.title[0]}</span>}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-700">{b.title}</p>
-                    <p className="truncate text-xs text-ink-soft">{m.name} · telat {Math.abs(daysUntil(l.dueDate))} hari</p>
-                  </div>
-                </div>
-              );
-            })}
-            <button onClick={() => goto("returns")} className="mt-1 inline-flex items-center gap-1 text-sm font-700 text-forest hover:gap-2 transition-all">
-              Kelola pengembalian <Icon.arrow className="w-4 h-4" />
-            </button>
-          </div>
-        </Card>
-      </div>
+        )}
+      </Card>
     </div>
   );
 }
@@ -172,101 +182,326 @@ function BooksManager() {
   const [cat, setCat] = useState("Semua");
   const [showAdd, setShowAdd] = useState(false);
   const [cover, setCover] = useState<string | null>(null);
+  const [books, setBooks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Form states for adding & editing book
+  const [title, setTitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [publisher, setPublisher] = useState("");
+  const [year, setYear] = useState("2026");
+  const [stock, setStock] = useState("3");
+  const [description, setDescription] = useState("");
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState("Mata Pelajaran");
+  const [editingBook, setEditingBook] = useState<any | null>(null);
+
   const cats = ["Semua", ...CATEGORIES.map((c) => c.name)];
+
+  const fetchBooks = () => {
+    api.getBooks().then((res) => {
+      if (res && res.books) {
+        setBooks(res.books);
+      }
+    }).catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchBooks();
+  }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCoverUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   function closeAdd() {
     setShowAdd(false);
+    setEditingBook(null);
     setCover(null);
+    setCoverUrl(null);
+    setTitle("");
+    setAuthor("");
+    setPublisher("");
+    setDescription("");
+    setSelectedCategory("Mata Pelajaran");
   }
-  function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => setCover(reader.result as string);
-    reader.readAsDataURL(file);
-  }
-  const rows = BOOKS.filter((b) => {
-    const okC = cat === "Semua" || b.category === cat;
+
+  const openEditBook = (b: any) => {
+    setEditingBook(b);
+    setTitle(b.title || "");
+    setAuthor(b.author || "");
+    setPublisher(b.publisher || "");
+    setYear(String(b.year || 2026));
+    setStock(String(b.stock !== undefined ? b.stock : b.copies || 1));
+    setDescription(b.description || "");
+    setSelectedCategory(b.category?.name || b.category || "Dongeng");
+    setCoverUrl(b.coverUrl || (b.cover && b.cover.startsWith("data:") ? b.cover : null));
+  };
+
+  const handleSaveBook = async () => {
+    if (!title || !author) {
+      alert("Judul dan Penulis buku wajib diisi!");
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        title,
+        author,
+        publisher,
+        year: Number(year) || 2026,
+        stock: Number(stock) || 1,
+        description,
+        categoryName: selectedCategory,
+        coverUrl: coverUrl || undefined,
+      };
+
+      if (editingBook) {
+        await api.updateBook(Number(editingBook.id), payload);
+      } else {
+        await api.createBook(payload);
+      }
+      closeAdd();
+      fetchBooks();
+    } catch (err: any) {
+      alert(err.message || "Gagal menyimpan buku.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteBook = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus buku ini?")) return;
+    try {
+      await api.deleteBook(id);
+      fetchBooks();
+    } catch (err: any) {
+      alert(err.message || "Gagal menghapus buku.");
+    }
+  };
+
+  const filterCategories = ["Semua", ...CATEGORIES.map((c) => c.name)];
+
+  const rows = books.filter((b) => {
+    const bCat = typeof b.category === "object" ? b.category?.name : (b.category || "Umum");
+    const okC = cat === "Semua" || (bCat && String(bCat).toLowerCase().trim() === cat.toLowerCase().trim());
     const okQ = !q || b.title.toLowerCase().includes(q.toLowerCase()) || b.author.toLowerCase().includes(q.toLowerCase());
     return okC && okQ;
   });
 
   return (
     <div className="space-y-6">
-      <PageHead title="Kelola Data Buku" desc={`${BOOKS.length} judul dalam koleksi.`} action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
+      <PageHead title="Kelola Data Buku" desc={`${rows.length} judul ditampilkan (${cat === "Semua" ? "semua kategori" : `kategori ${cat}`}).`} action={<Button onClick={() => { closeAdd(); setShowAdd(true); }}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <SearchInput value={q} onChange={setQ} placeholder="Cari judul atau penulis…" />
-        <select value={cat} onChange={(e) => setCat(e.target.value)} className={`${inputCls} w-auto`}>
-          {cats.map((c) => <option key={c}>{c}</option>)}
+        <select value={cat} onChange={(e) => setCat(e.target.value)} className={`${inputCls} w-auto font-700`}>
+          {filterCategories.map((c) => (
+            <option key={c} value={c}>{c === "Semua" ? "Semua Kategori" : c}</option>
+          ))}
         </select>
       </div>
 
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {filterCategories.map((c) => {
+          const emoji = CATEGORIES.find((catItem) => catItem.name === c)?.emoji || "";
+          const active = cat === c;
+          return (
+            <button
+              key={c}
+              onClick={() => setCat(c)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-800 transition ${active
+                ? "bg-forest text-paper shadow-sm"
+                : "border border-border bg-white text-ink-soft hover:border-forest hover:text-forest"
+                }`}
+            >
+              <span>{c === "Semua" ? "" : emoji}</span> <span>{c}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <Card className="overflow-hidden">
-        <TableHead cols={["Buku", "Kategori", "Tahun", "Stok", "Status", ""]} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]" />
-        {rows.map((b) => (
-          <Row key={b.id} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]">
-            <div className="flex items-center gap-3">
-              {b.cover ? <img src={b.cover} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover bg-paper-2" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs">{b.title[0]}</span>}
-              <div className="min-w-0"><p className="truncate font-700">{b.title}</p><p className="truncate text-xs text-ink-soft">{b.author}</p></div>
-            </div>
-            <span className="text-sm text-ink-soft">{b.category}</span>
-            <span className="text-sm">{b.year}</span>
-            <span className="text-sm font-700">{b.available}/{b.copies}</span>
-            <StatusBadge status={b.available > 0 ? "Tersedia" : "Dipinjam"} />
-            <div className="flex gap-1">
-              <IconBtn icon="edit" label="Edit" />
-              <IconBtn icon="trash" label="Hapus" danger />
-            </div>
-          </Row>
-        ))}
+        <TableHead cols={["Buku", "Kategori", "Tahun", "Stok Available", "Status", "Aksi"]} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]" />
+        {rows.map((b) => {
+          const avail = b.availableStock !== undefined ? b.availableStock : b.available;
+          const totalCopies = b.stock !== undefined ? b.stock : b.copies;
+          const catName = b.category?.name || b.category || "Umum";
+          const coverImg = b.coverUrl || b.cover;
+          const shortTitle = b.title.length > 25 ? b.title.substring(0, 25) + "…" : b.title;
+          const statusText = avail > 0 ? "Tersedia" : "Tidak Tersedia";
+
+          return (
+            <Row key={b.id} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]">
+              <div className="flex items-center gap-3">
+                {coverImg && (coverImg.startsWith("http") || coverImg.startsWith("data:")) ? (
+                  <img src={coverImg} alt="" className="h-10 w-8 shrink-0 rounded-md object-cover bg-paper-2 border border-border" />
+                ) : (
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs">{b.title[0]}</span>
+                )}
+                <div className="min-w-0" title={b.title}>
+                  <p className="truncate font-700">{shortTitle}</p>
+                  <p className="truncate text-xs text-ink-soft">{b.author}</p>
+                </div>
+              </div>
+              <span className="text-sm text-ink-soft">{catName}</span>
+              <span className="text-sm">{b.year || 2026}</span>
+              <span className="text-sm font-700">{avail}/{totalCopies}</span>
+              <StatusBadge status={statusText} />
+              <div className="flex gap-1">
+                <IconBtn icon="edit" label="Edit Buku" onClick={() => openEditBook(b)} />
+                <IconBtn icon="trash" label="Hapus Buku" danger onClick={() => handleDeleteBook(Number(b.id))} />
+              </div>
+            </Row>
+          );
+        })}
       </Card>
 
-      {showAdd && (
-        <Modal title="Tambah Buku Baru" onClose={closeAdd}>
-          <div className="grid gap-5 sm:grid-cols-[150px_1fr]">
-            {/* Cover uploader */}
-            <div>
-              <span className="block text-sm font-700 text-ink mb-1.5">Foto Sampul</span>
-              <label className="group relative block aspect-[3/4] cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-border transition hover:border-forest">
-                {cover ? (
-                  <>
-                    <img src={cover} alt="Pratinjau sampul" className="h-full w-full object-cover" />
-                    <span className="absolute inset-x-0 bottom-0 bg-forest-deep/70 py-1.5 text-center text-xs font-700 text-paper opacity-0 transition group-hover:opacity-100">Ganti foto</span>
-                  </>
+      {(showAdd || editingBook) && (
+        <Modal title={editingBook ? "Edit Data Buku" : "✨ Tambah Buku Baru ke Katalog"} onClose={closeAdd}>
+          <div className="space-y-5">
+            {/* Cover Upload Area */}
+            <div className="rounded-2xl border-2 border-dashed border-forest/30 bg-forest-soft/30 p-4 transition-all hover:border-forest hover:bg-forest-soft/50">
+              <label className="block text-xs font-800 uppercase tracking-wider text-forest mb-2">Foto Cover Buku</label>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {coverUrl ? (
+                  <div className="relative aspect-[3/4] w-24 overflow-hidden rounded-xl border-2 border-white shadow-md shrink-0 group">
+                    <img src={coverUrl} alt="Preview Cover" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setCoverUrl(null)}
+                      className="absolute top-1.5 right-1.5 grid h-6 w-6 place-items-center rounded-full bg-danger/90 text-white text-xs font-bold shadow-md hover:bg-danger"
+                      title="Hapus Foto"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ) : (
-                  <span className="flex h-full flex-col items-center justify-center gap-2 bg-forest-soft/40 p-3 text-center text-ink-soft">
-                    <Icon.image className="w-8 h-8 text-forest" />
-                    <span className="text-xs font-700 leading-tight">Klik untuk unggah sampul</span>
-                    <span className="text-[0.65rem]">JPG / PNG</span>
-                  </span>
+                  <div className="grid aspect-[3/4] w-24 shrink-0 place-items-center rounded-xl border-2 border-dashed border-border bg-white text-ink-soft text-xs text-center p-2 shadow-inner">
+                    <div>
+                      <Icon.image className="w-6 h-6 mx-auto mb-1 text-forest/60" />
+                      <span className="text-[0.65rem] font-700">Preview Cover</span>
+                    </div>
+                  </div>
                 )}
-                <input type="file" accept="image/*" onChange={onPickCover} className="sr-only" />
-              </label>
-              {cover && (
-                <button type="button" onClick={() => setCover(null)} className="mt-2 inline-flex items-center gap-1 text-xs font-700 text-danger hover:underline">
-                  <Icon.trash className="w-3.5 h-3.5" /> Hapus foto
-                </button>
-              )}
+                <div className="flex-1 text-center sm:text-left">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="cover-upload-input"
+                  />
+                  <label
+                    htmlFor="cover-upload-input"
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-700 text-paper shadow-sm hover:bg-forest-deep transition transform active:scale-95"
+                  >
+                    <Icon.image className="w-4 h-4" /> {coverUrl ? "Ganti Foto Cover" : "Pilih Foto Gambar"}
+                  </label>
+                  <p className="mt-2 text-xs text-ink-soft">Format gambar: JPG, PNG, atau WebP. Foto akan langsung ditampilkan di katalog siswa.</p>
+                </div>
+              </div>
             </div>
 
-            {/* Fields */}
+            {/* Form Inputs Grid */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="Judul Buku"><input className={inputCls} placeholder="Masukkan judul" /></Field></div>
-              <Field label="Penulis"><input className={inputCls} placeholder="Nama penulis" /></Field>
-              <Field label="Penerbit"><input className={inputCls} placeholder="Nama penerbit" /></Field>
-              <Field label="Tahun Terbit"><input className={inputCls} placeholder="2026" /></Field>
-              <Field label="Kategori">
-                <select className={inputCls}>{CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}</select>
+              <div className="sm:col-span-2">
+                <Field label="Judul Buku">
+                  <input
+                    className={inputCls}
+                    placeholder="Masukkan judul buku lengkap…"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    required
+                  />
+                </Field>
+              </div>
+
+              <div className="sm:col-span-2">
+                <Field label="Kategori Buku">
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className={inputCls}
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.name} value={c.name}>
+                        {c.emoji} {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+
+              <Field label="Penulis / Pengarang">
+                <input
+                  className={inputCls}
+                  placeholder="Nama penulis"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  required
+                />
               </Field>
-              <div className="sm:col-span-2"><Field label="Jumlah Eksemplar"><input className={inputCls} placeholder="3" /></Field></div>
-              <div className="sm:col-span-2"><Field label="Deskripsi"><textarea className={`${inputCls} min-h-24`} placeholder="Ringkasan buku…" /></Field></div>
+
+              <Field label="Penerbit">
+                <input
+                  className={inputCls}
+                  placeholder="Nama penerbit"
+                  value={publisher}
+                  onChange={(e) => setPublisher(e.target.value)}
+                />
+              </Field>
+
+              <Field label="Tahun Terbit">
+                <input
+                  className={inputCls}
+                  placeholder="2026"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                />
+              </Field>
+
+              <Field label="Jumlah Stok Buku">
+                <input
+                  type="number"
+                  min="1"
+                  className={inputCls}
+                  placeholder="3"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
+                />
+              </Field>
+
+              <div className="sm:col-span-2">
+                <Field label="Ringkasan & Deskripsi Buku">
+                  <textarea
+                    rows={3}
+                    className={`${inputCls} resize-none`}
+                    placeholder="Tuliskan ringkasan singkat isi buku..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </Field>
+              </div>
             </div>
-          </div>
-          <div className="mt-6 flex justify-end gap-3">
-            <Button variant="ghost" onClick={closeAdd}>Batal</Button>
-            <Button onClick={closeAdd}><Icon.check className="w-5 h-5" /> Simpan Buku</Button>
+
+            {/* Modal Actions */}
+            <div className="pt-3 flex items-center justify-end gap-3 border-t border-border">
+              <Button variant="ghost" onClick={closeAdd}>
+                Batal
+              </Button>
+              <Button onClick={handleSaveBook} disabled={loading} size="lg" className="px-7">
+                <Icon.check className="w-5 h-5" /> {loading ? "Menyimpan Data Buku." : editingBook ? "Perbarui Buku" : "Simpan data Buku"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
@@ -274,56 +509,177 @@ function BooksManager() {
   );
 }
 
-/* ---------------- Members Manager ---------------- */
+/* ---------------- Members Manager (Siswa & Guru) ---------------- */
 function MembersManager() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("Semua");
   const [showAdd, setShowAdd] = useState(false);
-  const rows = MEMBERS.filter((m) => {
+  const [members, setMembers] = useState<any[]>([]);
+
+  // States for adding member
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [nim, setNim] = useState("");
+  const [phone, setPhone] = useState("");
+  const [memberRole, setMemberRole] = useState<"STUDENT" | "TEACHER">("STUDENT");
+  const [loading, setLoading] = useState(false);
+
+  const fetchUsersList = () => {
+    api.getUsers().then((res) => {
+      if (res && res.users) {
+        setMembers(res.users.filter((u: any) => u.role === "STUDENT" || u.role === "TEACHER"));
+      }
+    }).catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchUsersList();
+  }, []);
+
+  const handleAddMember = async () => {
+    if (!name || !email || !password) {
+      alert("Nama, Email, dan Password wajib diisi!");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.register({
+        name,
+        email,
+        password,
+        nim: nim || undefined,
+        phone: phone || undefined,
+        role: memberRole,
+      });
+      setShowAdd(false);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setNim("");
+      setPhone("");
+      setMemberRole("STUDENT");
+
+      fetchUsersList();
+    } catch (err: any) {
+      alert(err.message || "Gagal menambahkan anggota.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const rows = members.filter((m) => {
     const okR = role === "Semua" || m.role === role;
-    const okQ = !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.idNumber.includes(q);
+    const okQ = !q || m.name?.toLowerCase().includes(q.toLowerCase()) || (m.nim && m.nim.includes(q)) || m.email?.toLowerCase().includes(q.toLowerCase());
     return okR && okQ;
   });
 
   return (
     <div className="space-y-6">
-      <PageHead title="Kelola Data Anggota" desc={`${MEMBERS.length} anggota terdaftar.`} action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Anggota</Button>} />
+      <PageHead
+        title="Kelola Data Anggota (Siswa & Guru)"
+        desc={`${members.length} anggota terdaftar di database MySQL.`}
+        action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Anggota</Button>}
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchInput value={q} onChange={setQ} placeholder="Cari nama atau NIS/NIP…" />
-        <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} w-auto`}>
-          <option>Semua</option><option>Siswa</option><option>Guru</option>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SearchInput value={q} onChange={setQ} placeholder="Cari nama, email, atau NIS/NIP…" />
+        <select value={role} onChange={(e) => setRole(e.target.value)} className={`${inputCls} w-auto font-700`}>
+          <option value="Semua">Semua Peran (Siswa & Guru)</option>
+          <option value="STUDENT">Siswa (STUDENT)</option>
+          <option value="TEACHER">Guru (TEACHER)</option>
         </select>
       </div>
 
       <Card className="overflow-hidden">
-        <TableHead cols={["Anggota", "NIS / NIP", "Kelas / Status", "Pinjaman Aktif", ""]} widths="grid-cols-[2fr_1fr_1.3fr_1fr_.8fr]" />
-        {rows.map((m) => (
-          <Row key={m.id} widths="grid-cols-[2fr_1fr_1.3fr_1fr_.8fr]">
-            <div className="flex items-center gap-3">
-              <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full font-800 ${m.role === "Guru" ? "bg-amber text-ink" : "bg-forest text-paper"}`}>{m.name[0]}</span>
-              <div className="min-w-0"><p className="truncate font-700">{m.name}</p><p className="truncate text-xs text-ink-soft">{m.email}</p></div>
-            </div>
-            <span className="text-sm">{m.idNumber}</span>
-            <span className="text-sm text-ink-soft">{m.role} · {m.kelas}</span>
-            <span className="text-sm"><b>{m.activeLoans}</b> buku</span>
-            <div className="flex gap-1"><IconBtn icon="edit" label="Edit" /><IconBtn icon="trash" label="Hapus" danger /></div>
-          </Row>
-        ))}
+        <TableHead cols={["Anggota", "NIS / NIP / NIM", "Peran", "Total Pinjaman", "No HP"]} widths="grid-cols-[2fr_1fr_1fr_1fr_1fr]" />
+        {rows.length === 0 ? (
+          <div className="p-8 text-center text-ink-soft font-600">Tidak ada data anggota yang ditemukan.</div>
+        ) : (
+          rows.map((m) => (
+            <Row key={m.id} widths="grid-cols-[2fr_1fr_1fr_1fr_1fr]">
+              <div className="flex items-center gap-3">
+                <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full font-800 ${m.role === "TEACHER" ? "bg-berry text-paper" : "bg-forest text-paper"}`}>{m.name ? m.name[0] : "U"}</span>
+                <div className="min-w-0"><p className="truncate font-700">{m.name}</p><p className="truncate text-xs text-ink-soft">{m.email}</p></div>
+              </div>
+              <span className="text-sm">{m.nim || m.idNumber || "-"}</span>
+              <span className="text-sm font-700 text-ink-soft">{m.role === "TEACHER" ? "Guru" : "Siswa"}</span>
+              <span className="text-sm"><b>{m._count?.borrowings !== undefined ? m._count.borrowings : m.activeLoans || 0}</b> buku</span>
+              <span className="text-sm text-ink-soft">{m.phone || "-"}</span>
+            </Row>
+          ))
+        )}
       </Card>
 
       {showAdd && (
-        <Modal title="Tambah Anggota" onClose={() => setShowAdd(false)}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2"><Field label="Nama Lengkap"><input className={inputCls} /></Field></div>
-            <Field label="NIS / NIP"><input className={inputCls} /></Field>
-            <Field label="Peran"><select className={inputCls}><option>Siswa</option><option>Guru</option></select></Field>
-            <Field label="Kelas / Status"><input className={inputCls} placeholder="5A / Guru IPA" /></Field>
-            <Field label="Email"><input className={inputCls} /></Field>
-          </div>
-          <div className="mt-6 flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
-            <Button onClick={() => setShowAdd(false)}><Icon.check className="w-5 h-5" /> Simpan</Button>
+        <Modal title="👤 Tambah Anggota Baru (Siswa / Guru)" onClose={() => setShowAdd(false)}>
+          <div className="space-y-4">
+            <Field label="Nama Lengkap">
+              <input
+                className={inputCls}
+                placeholder="Ahmad Rizky / Ibu Siti"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Email">
+                <input
+                  type="email"
+                  className={inputCls}
+                  placeholder="email@sekolah.sch.id"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </Field>
+              <Field label="Kata Sandi">
+                <input
+                  type="password"
+                  className={inputCls}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="NIS / NIP / NIM">
+                <input
+                  className={inputCls}
+                  placeholder="19850101..."
+                  value={nim}
+                  onChange={(e) => setNim(e.target.value)}
+                />
+              </Field>
+              <Field label="No HP">
+                <input
+                  className={inputCls}
+                  placeholder="08123456789"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
+              </Field>
+            </div>
+            <Field label="Peran Anggota">
+              <select
+                value={memberRole}
+                onChange={(e) => setMemberRole(e.target.value as "STUDENT" | "TEACHER")}
+                className={inputCls}
+              >
+                <option value="STUDENT">Siswa (STUDENT)</option>
+                <option value="TEACHER">Guru (TEACHER)</option>
+              </select>
+            </Field>
+
+            <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-border">
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
+              <Button onClick={handleAddMember} disabled={loading}>
+                <Icon.check className="w-5 h-5" /> {loading ? "Menyimpan..." : "Simpan Anggota"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
@@ -331,15 +687,129 @@ function MembersManager() {
   );
 }
 
-/* ---------------- Loans Manager ---------------- */
-function LoansManager() {
-  const [showAdd, setShowAdd] = useState(false);
-  const [filter, setFilter] = useState("Semua");
-  const rows = LOANS.filter((l) => filter === "Semua" || l.status === filter);
+/* ---------------- Admin Manager (Petugas Admin Utama) ---------------- */
+function AdminManager() {
+  const [q, setQ] = useState("");
+  const [admins, setAdmins] = useState<any[]>([]);
+
+  useEffect(() => {
+    api.getUsers().then((res) => {
+      if (res && res.users) {
+        setAdmins(res.users.filter((u: any) => u.role === "ADMIN"));
+      }
+    }).catch(() => { });
+  }, []);
+
+  const rows = admins.filter((m) => !q || m.name?.toLowerCase().includes(q.toLowerCase()) || m.email?.toLowerCase().includes(q.toLowerCase()));
 
   return (
     <div className="space-y-6">
-      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku." action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
+      <PageHead
+        title="Data Petugas Admin (Pengelola Utama)"
+        desc="Akun terautentikasi pengelola sistem & administrasi perpustakaan (MySQL)."
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SearchInput value={q} onChange={setQ} placeholder="Cari nama atau email admin…" />
+      </div>
+
+      <Card className="overflow-hidden">
+        <TableHead cols={["Nama Petugas Admin", "Email Utama", "NIP / ID", "Peran Hak Akses", "No Telepon"]} widths="grid-cols-[2fr_1.8fr_1fr_1.2fr_1fr]" />
+        {rows.length === 0 ? (
+          <div className="p-8 text-center text-ink-soft font-600">Tidak ada data admin yang ditemukan.</div>
+        ) : (
+          rows.map((m) => (
+            <Row key={m.id} widths="grid-cols-[2fr_1.8fr_1fr_1.2fr_1fr]">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-amber text-ink font-800">{m.name ? m.name[0] : "A"}</span>
+                <div className="min-w-0">
+                  <p className="truncate font-700">{m.name}</p>
+                  <p className="truncate text-xs text-ink-soft">Admin KANCIL</p>
+                </div>
+              </div>
+              <span className="text-sm font-600">{m.email}</span>
+              <span className="text-sm">{m.nim || m.idNumber || "ADMIN-01"}</span>
+              <span className="text-sm font-800 text-forest">Administrator</span>
+              <span className="text-sm text-ink-soft">{m.phone || "-"}</span>
+            </Row>
+          ))
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ---------------- Loans Manager ---------------- */
+function LoansManager({ borrowings, onUpdateStatus }: { borrowings: any[]; onUpdateStatus: (id: number, status: string) => void }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [filter, setFilter] = useState("Semua");
+  const [membersList, setMembersList] = useState<any[]>([]);
+  const [booksList, setBooksList] = useState<any[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<number | "">("");
+  const [selectedBookId, setSelectedBookId] = useState<number | "">("");
+  const [borrowDate, setBorrowDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dueDate, setDueDate] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0]);
+  const [submitLoading, setSubmitLoading] = useState(false);
+
+  const fetchAddData = () => {
+    api.getUsers().then((res) => {
+      if (res && res.users) {
+        setMembersList(res.users);
+        if (res.users.length > 0) setSelectedUserId(res.users[0].id);
+      }
+    }).catch(() => { });
+
+    api.getBooks().then((res) => {
+      if (res && res.books) {
+        setBooksList(res.books);
+        const availBooks = res.books.filter((b: any) => b.availableStock > 0);
+        if (availBooks.length > 0) setSelectedBookId(availBooks[0].id);
+      }
+    }).catch(() => { });
+  };
+
+  useEffect(() => {
+    fetchAddData();
+  }, []);
+
+  const openAddModal = () => {
+    fetchAddData();
+    setShowAdd(true);
+  };
+
+  const handleCreateBorrow = async () => {
+    if (!selectedUserId || !selectedBookId) {
+      alert("Silakan pilih Anggota dan Buku terlebih dahulu.");
+      return;
+    }
+    setSubmitLoading(true);
+    try {
+      await api.createBorrowByAdmin({
+        userId: Number(selectedUserId),
+        bookId: Number(selectedBookId),
+        borrowDate,
+        dueDate,
+      });
+      setShowAdd(false);
+      window.location.reload();
+    } catch (err: any) {
+      alert(err.message || "Gagal mencatat peminjaman.");
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const rows = borrowings.length > 0 ? borrowings.filter((l) => {
+    if (filter === "Semua") return true;
+    if (filter === "Dipinjam") return l.status === "BORROWED" || l.status === "PENDING";
+    if (filter === "Terlambat") return l.status === "OVERDUE";
+    if (filter === "Dikembalikan") return l.status === "RETURNED";
+    return true;
+  }) : LOANS.filter((l) => filter === "Semua" || l.status === filter);
+
+  return (
+    <div className="space-y-6">
+      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku dari siswa (MySQL Realtime)." action={<Button onClick={openAddModal}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
 
       <div className="flex flex-wrap gap-2">
         {["Semua", "Dipinjam", "Terlambat", "Dikembalikan"].map((f) => (
@@ -348,34 +818,98 @@ function LoansManager() {
       </div>
 
       <Card className="overflow-hidden">
-        <TableHead cols={["Anggota", "Buku", "Tgl Pinjam", "Batas Kembali", "Status"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]" />
+        <TableHead cols={["Anggota", "Buku", "Tgl Pinjam", "Batas Kembali", "Status / Aksi"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1.5fr]" />
         {rows.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
+          const userName = l.user?.name || "Siswa";
+          const userNim = l.user?.nim || "NIS";
+          const bookTitle = l.book?.title || "Buku";
+          const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "2026-09-03";
+          const dueDateStr = l.dueDate ? String(l.dueDate).split("T")[0] : "2026-09-10";
+
           return (
-            <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]">
-              <div className="min-w-0"><p className="truncate font-700">{m.name}</p><p className="text-xs text-ink-soft">{m.role} · {m.kelas}</p></div>
-              <div className="flex items-center gap-2 min-w-0">{b.cover ? <img src={b.cover} alt="" className="h-5 w-5 rounded object-cover bg-paper-2" /> : <span className="grid h-5 w-5 place-items-center rounded bg-paper-2 text-ink-soft text-[0.6rem]">{b.title[0]}</span>}<span className="truncate text-sm">{b.title}</span></div>
-              <span className="text-sm text-ink-soft">{formatDate(l.borrowDate)}</span>
-              <span className="text-sm text-ink-soft">{formatDate(l.dueDate)}</span>
-              <StatusBadge status={l.status} />
+            <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1.5fr]">
+              <div className="min-w-0"><p className="truncate font-700">{userName}</p><p className="text-xs text-ink-soft">{userNim}</p></div>
+              <div className="flex items-center gap-2 min-w-0"><span className="grid h-5 w-5 place-items-center rounded bg-paper-2 text-ink-soft text-[0.6rem]">{bookTitle[0]}</span><span className="truncate text-sm">{bookTitle}</span></div>
+              <span className="text-sm text-ink-soft">{borrowDateStr}</span>
+              <span className="text-sm text-ink-soft">{dueDateStr}</span>
+              <div className="flex items-center gap-2">
+                <StatusBadge status={l.status === "BORROWED" ? "Dipinjam" : l.status === "RETURNED" ? "Dikembalikan" : l.status === "PENDING" ? "Tersedia" : l.status} />
+                {l.status === "PENDING" && (
+                  <Button size="sm" onClick={() => onUpdateStatus(l.id, "BORROWED")} className="py-1 px-2 text-xs">Setujui</Button>
+                )}
+                {l.status === "BORROWED" && (
+                  <Button size="sm" variant="secondary" onClick={() => onUpdateStatus(l.id, "RETURNED")} className="py-1 px-2 text-xs">Kembalikan</Button>
+                )}
+              </div>
             </Row>
           );
         })}
       </Card>
 
       {showAdd && (
-        <Modal title="Tambah Peminjaman" onClose={() => setShowAdd(false)}>
-          <div className="grid gap-4">
-            <Field label="Anggota"><select className={inputCls}>{MEMBERS.map((m) => <option key={m.id}>{m.name} — {m.idNumber}</option>)}</select></Field>
-            <Field label="Buku"><select className={inputCls}>{BOOKS.filter((b) => b.available > 0).map((b) => <option key={b.id}>{b.title}</option>)}</select></Field>
+        <Modal title="Catat Peminjaman Baru" onClose={() => setShowAdd(false)}>
+          <div className="space-y-4">
+            <Field label="Anggota / Siswa Peminjam">
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(Number(e.target.value))}
+                className={inputCls}
+              >
+                {membersList.length === 0 ? (
+                  <option value="">Belum ada anggota terdaftar</option>
+                ) : (
+                  membersList.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} — {m.nim || m.email} ({m.role})
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+
+            <Field label="Pilih Buku Yang Dipinjam">
+              <select
+                value={selectedBookId}
+                onChange={(e) => setSelectedBookId(Number(e.target.value))}
+                className={inputCls}
+              >
+                {booksList.length === 0 ? (
+                  <option value="">Belum ada buku tersedia</option>
+                ) : (
+                  booksList.map((b) => (
+                    <option key={b.id} value={b.id} disabled={b.availableStock < 1}>
+                      {b.title} — {b.author} ({b.availableStock > 0 ? `Stok: ${b.availableStock}` : "Habis"})
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Tanggal Pinjam"><input type="date" className={inputCls} defaultValue="2026-08-30" /></Field>
-              <Field label="Batas Kembali"><input type="date" className={inputCls} defaultValue="2026-09-13" /></Field>
+              <Field label="Tanggal Pinjam">
+                <input
+                  type="date"
+                  value={borrowDate}
+                  onChange={(e) => setBorrowDate(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Batas Kembali">
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
             </div>
-          </div>
-          <div className="mt-6 flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
-            <Button onClick={() => setShowAdd(false)}><Icon.check className="w-5 h-5" /> Catat Peminjaman</Button>
+
+            <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-border">
+              <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
+              <Button onClick={handleCreateBorrow} disabled={submitLoading}>
+                <Icon.check className="w-5 h-5" /> {submitLoading ? "Mencatat..." : "Catat Peminjaman"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
@@ -384,28 +918,44 @@ function LoansManager() {
 }
 
 /* ---------------- Returns Manager ---------------- */
-function ReturnsManager() {
-  const [returned, setReturned] = useState<Set<string>>(new Set());
-  const rows = LOANS.filter((l) => l.returnDate === null && !returned.has(l.id));
+function ReturnsManager({ borrowings = [], onUpdateStatus }: { borrowings?: any[]; onUpdateStatus: (id: number, status: string) => void }) {
+  const activeLoans = borrowings.filter((l) => l.status === "BORROWED");
+  const returnedLoans = borrowings.filter((l) => l.status === "RETURNED");
 
   return (
     <div className="space-y-6">
-      <PageHead title="Data Pengembalian" desc="Buku yang sedang dipinjam dan menunggu dikembalikan." />
+      <PageHead title="Data Pengembalian Buku (MySQL)" desc={`Total ${returnedLoans.length} buku telah berhasil dikembalikan.`} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="p-5 bg-forest-soft/30 border-forest/20">
+          <p className="text-sm font-700 text-forest">Sedang Dipinjam Siswa</p>
+          <p className="text-3xl font-display font-700 text-forest-deep mt-1">{activeLoans.length} Buku</p>
+        </Card>
+        <Card className="p-5 bg-amber-soft/30 border-amber/20">
+          <p className="text-sm font-700 text-warn">Total Telah Dikembalikan</p>
+          <p className="text-3xl font-display font-700 text-ink mt-1">{returnedLoans.length} Buku</p>
+        </Card>
+      </div>
 
       <Card className="overflow-hidden">
+        <h3 className="p-4 font-700 text-lg border-b border-border bg-paper-2/40">Buku Yang Sedang Dipinjam (Menunggu Pengembalian)</h3>
         <TableHead cols={["Peminjam", "Buku", "Tgl Pinjam", "Batas Kembali", "Status", "Aksi"]} widths="grid-cols-[1.3fr_1.6fr_1fr_1fr_1fr_1.1fr]" />
-        {rows.length === 0 && <div className="p-10 text-center text-ink-soft">Semua buku sudah dikembalikan. 🎉</div>}
-        {rows.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
-          const late = l.status === "Terlambat" || daysUntil(l.dueDate) < 0;
+        {activeLoans.length === 0 && <div className="p-8 text-center text-ink-soft">Semua buku yang dipinjam telah dikembalikan ke rak. 🎉</div>}
+        {activeLoans.map((l) => {
+          const userName = l.user?.name || "Siswa";
+          const userNim = l.user?.nim || "NIS";
+          const bookTitle = l.book?.title || "Buku";
+          const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "2026-09-03";
+          const dueDateStr = l.dueDate ? String(l.dueDate).split("T")[0] : "2026-09-10";
+
           return (
             <Row key={l.id} widths="grid-cols-[1.3fr_1.6fr_1fr_1fr_1fr_1.1fr]">
-              <div className="min-w-0"><p className="truncate font-700">{m.name}</p><p className="text-xs text-ink-soft">{m.kelas}</p></div>
-              <div className="flex items-center gap-2 min-w-0">{b.cover ? <img src={b.cover} alt="" className="h-5 w-5 rounded object-cover bg-paper-2" /> : <span className="grid h-5 w-5 place-items-center rounded bg-paper-2 text-ink-soft text-[0.6rem]">{b.title[0]}</span>}<span className="truncate text-sm">{b.title}</span></div>
-              <span className="text-sm text-ink-soft">{formatDate(l.borrowDate)}</span>
-              <span className={`text-sm ${late ? "font-800 text-danger" : "text-ink-soft"}`}>{formatDate(l.dueDate)}</span>
-              <StatusBadge status={l.status} />
-              <Button size="sm" variant={late ? "secondary" : "primary"} onClick={() => setReturned((s) => new Set(s).add(l.id))}>
+              <div className="min-w-0"><p className="truncate font-700">{userName}</p><p className="text-xs text-ink-soft">{userNim}</p></div>
+              <div className="flex items-center gap-2 min-w-0"><span className="grid h-5 w-5 place-items-center rounded bg-paper-2 text-ink-soft text-[0.6rem]">{bookTitle[0]}</span><span className="truncate text-sm">{bookTitle}</span></div>
+              <span className="text-sm text-ink-soft">{borrowDateStr}</span>
+              <span className="text-sm text-ink-soft">{dueDateStr}</span>
+              <StatusBadge status="Dipinjam" />
+              <Button size="sm" variant="secondary" onClick={() => onUpdateStatus(l.id, "RETURNED")}>
                 <Icon.check className="w-4 h-4" /> Kembalikan
               </Button>
             </Row>
@@ -413,24 +963,43 @@ function ReturnsManager() {
         })}
       </Card>
 
-      {returned.size > 0 && (
-        <p className="flex items-center gap-2 text-sm font-700 text-forest"><Icon.check className="w-4 h-4" /> {returned.size} buku berhasil dikembalikan dan kembali ke rak.</p>
+      {returnedLoans.length > 0 && (
+        <Card className="overflow-hidden mt-6">
+          <h3 className="p-4 font-700 text-lg border-b border-border bg-paper-2/40">Riwayat Pengembalian Buku Selesai ({returnedLoans.length})</h3>
+          <TableHead cols={["Peminjam", "Buku", "Tgl Pinjam", "Tgl Pengembalian", "Status"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]" />
+          {returnedLoans.map((l) => {
+            const userName = l.user?.name || "Siswa";
+            const bookTitle = l.book?.title || "Buku";
+            const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "-";
+            const returnDateStr = l.returnDate ? String(l.returnDate).split("T")[0] : "Hari ini";
+
+            return (
+              <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]">
+                <span className="truncate font-700">{userName}</span>
+                <span className="truncate text-sm font-600 text-forest">{bookTitle}</span>
+                <span className="text-sm text-ink-soft">{borrowDateStr}</span>
+                <span className="text-sm text-ink-soft font-700">{returnDateStr}</span>
+                <StatusBadge status="Dikembalikan" />
+              </Row>
+            );
+          })}
+        </Card>
       )}
     </div>
   );
 }
 
 /* ---------------- Reports ---------------- */
-function Reports() {
+function Reports({ borrowings = [] }: { borrowings?: any[] }) {
   const [tab, setTab] = useState<"pinjam" | "kembali" | "telat">("pinjam");
-  const borrowed = LOANS;
-  const returnedRows = LOANS.filter((l) => l.returnDate !== null);
-  const lateRows = LOANS.filter((l) => l.status === "Terlambat");
+  const borrowed = borrowings;
+  const returnedRows = borrowings.filter((l) => l.status === "RETURNED");
+  const lateRows = borrowings.filter((l) => l.status === "OVERDUE");
   const dataset = tab === "pinjam" ? borrowed : tab === "kembali" ? returnedRows : lateRows;
 
   return (
     <div className="space-y-6">
-      <PageHead title="Laporan" desc="Rekap peminjaman, pengembalian, dan keterlambatan." action={<Button variant="secondary"><Icon.download className="w-5 h-5" /> Export {tab === "pinjam" ? "Peminjaman" : tab === "kembali" ? "Pengembalian" : "Keterlambatan"}</Button>} />
+      <PageHead title="Laporan Database MySQL" desc="Rekap peminjaman, pengembalian, dan keterlambatan." />
 
       <div className="grid grid-cols-3 gap-4">
         <ReportCard active={tab === "pinjam"} onClick={() => setTab("pinjam")} label="Total Peminjaman" value={borrowed.length} icon="swap" />
@@ -440,15 +1009,20 @@ function Reports() {
 
       <Card className="overflow-hidden">
         <TableHead cols={["Anggota", "Buku", "Tgl Pinjam", tab === "kembali" ? "Tgl Kembali" : "Batas Kembali", "Status"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]" />
+        {dataset.length === 0 && <div className="p-8 text-center text-ink-soft">Belum ada data pada kategori ini.</div>}
         {dataset.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
+          const userName = l.user?.name || "Siswa";
+          const bookTitle = l.book?.title || "Buku";
+          const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "-";
+          const returnDateStr = l.returnDate ? String(l.returnDate).split("T")[0] : l.dueDate ? String(l.dueDate).split("T")[0] : "-";
+
           return (
             <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]">
-              <span className="truncate font-700">{m.name}</span>
-              <div className="flex items-center gap-2 min-w-0">{b.cover ? <img src={b.cover} alt="" className="h-5 w-5 rounded object-cover bg-paper-2" /> : <span className="grid h-5 w-5 place-items-center rounded bg-paper-2 text-ink-soft text-[0.6rem]">{b.title[0]}</span>}<span className="truncate text-sm">{b.title}</span></div>
-              <span className="text-sm text-ink-soft">{formatDate(l.borrowDate)}</span>
-              <span className="text-sm text-ink-soft">{tab === "kembali" && l.returnDate ? formatDate(l.returnDate) : formatDate(l.dueDate)}</span>
-              <StatusBadge status={l.status} />
+              <span className="truncate font-700">{userName}</span>
+              <span className="truncate text-sm">{bookTitle}</span>
+              <span className="text-sm text-ink-soft">{borrowDateStr}</span>
+              <span className="text-sm text-ink-soft">{returnDateStr}</span>
+              <StatusBadge status={l.status === "RETURNED" ? "Dikembalikan" : l.status === "BORROWED" ? "Dipinjam" : l.status} />
             </Row>
           );
         })}
@@ -495,10 +1069,10 @@ function Row({ children, widths }: { children: React.ReactNode; widths: string }
   );
 }
 
-function IconBtn({ icon, label, danger }: { icon: keyof typeof Icon; label: string; danger?: boolean }) {
+function IconBtn({ icon, label, danger, onClick }: { icon: keyof typeof Icon; label: string; danger?: boolean; onClick?: () => void }) {
   const IconC = Icon[icon];
   return (
-    <button aria-label={label} title={label} className={`grid h-8 w-8 place-items-center rounded-lg transition ${danger ? "text-ink-soft hover:bg-danger/10 hover:text-danger" : "text-ink-soft hover:bg-forest-soft hover:text-forest"}`}>
+    <button onClick={onClick} aria-label={label} title={label} className={`grid h-8 w-8 place-items-center rounded-lg transition ${danger ? "text-ink-soft hover:bg-danger/10 hover:text-danger" : "text-ink-soft hover:bg-forest-soft hover:text-forest"}`}>
       <IconC className="w-4 h-4" />
     </button>
   );

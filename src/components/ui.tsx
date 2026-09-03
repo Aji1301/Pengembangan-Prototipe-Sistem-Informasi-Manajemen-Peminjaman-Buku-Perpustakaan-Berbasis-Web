@@ -2,34 +2,15 @@ import type { ReactNode } from "react";
 import type { Book, LoanStatus } from "../lib/data";
 
 /* ---------- Kancil mascot logo ---------- */
-export function Logo({ size = 40, withText = true }: { size?: number; withText?: boolean }) {
+export function Logo({ size = 60 }: { size?: number; withText?: boolean }) {
   return (
-    <div className="flex items-center gap-2.5 select-none">
-      <div
-        className="grid place-items-center rounded-2xl bg-forest text-paper shadow-sm"
-        style={{ width: size, height: size }}
-        aria-hidden
-      >
-        <svg viewBox="0 0 48 48" width={size * 0.66} height={size * 0.66} fill="none">
-          {/* antlers */}
-          <path d="M16 15c-2-4-6-5-8-4 3 1 4 4 4 7M32 15c2-4 6-5 8-4-3 1-4 4-4 7" stroke="#fbf5e9" strokeWidth="2.4" strokeLinecap="round" />
-          {/* head */}
-          <path d="M24 12c7 0 11 5 11 12 0 8-5 14-11 14S13 32 13 24c0-7 4-12 11-12Z" fill="#fbf5e9" />
-          {/* ears */}
-          <ellipse cx="14" cy="20" rx="3" ry="5" fill="#fbf5e9" transform="rotate(-25 14 20)" />
-          <ellipse cx="34" cy="20" rx="3" ry="5" fill="#fbf5e9" transform="rotate(25 34 20)" />
-          {/* eyes + nose */}
-          <circle cx="20" cy="24" r="2" fill="#2f6b4f" />
-          <circle cx="28" cy="24" r="2" fill="#2f6b4f" />
-          <path d="M24 29c-1.6 0-2.6 1-2.6 2.2 0 1.4 1.3 2.3 2.6 2.3s2.6-.9 2.6-2.3c0-1.2-1-2.2-2.6-2.2Z" fill="#e08a3c" />
-        </svg>
-      </div>
-      {withText && (
-        <div className="leading-none">
-          <div className="font-display font-700 text-[1.35rem] tracking-tight text-forest">KANCIL</div>
-          <div className="text-[0.6rem] font-700 uppercase tracking-[0.18em] text-ink-soft">Perpustakaan Sekolah</div>
-        </div>
-      )}
+    <div className="flex items-center select-none">
+      <img
+        src="/logo.png"
+        alt="KANCIL - Katalog Anak Cinta Literasi"
+        style={{ height: `${size}px` }}
+        className="w-auto object-contain max-w-full drop-shadow-sm"
+      />
     </div>
   );
 }
@@ -117,15 +98,16 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
 }
 
 /* ---------- Status badge ---------- */
-export function StatusBadge({ status }: { status: LoanStatus | "Tersedia" | "Dipinjam" }) {
+export function StatusBadge({ status }: { status: LoanStatus | "Tersedia" | "Dipinjam" | "Tidak Tersedia" }) {
   const map: Record<string, string> = {
     Tersedia: "bg-forest-soft text-forest",
     Dipinjam: "bg-amber-soft text-warn",
+    "Tidak Tersedia": "bg-danger/12 text-danger font-bold",
     Dikembalikan: "bg-forest-soft text-forest",
     Terlambat: "bg-danger/12 text-danger",
   };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-800 ${map[status]}`}>
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-800 ${map[status] || "bg-paper-2 text-ink-soft"}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
       {status}
     </span>
@@ -133,14 +115,18 @@ export function StatusBadge({ status }: { status: LoanStatus | "Tersedia" | "Dip
 }
 
 /* ---------- Book cover ---------- */
-export function BookCover({ book, className = "" }: { book: Book; className?: string }) {
+export function BookCover({ book, className = "" }: { book: any; className?: string }) {
+  const imgSrc = book.coverUrl || book.cover;
+  const isImage = imgSrc && (imgSrc.startsWith("http") || imgSrc.startsWith("data:image"));
+
   return (
     <div className={`relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-paper-2 shadow-sm ${className}`}>
-      {book.cover ? (
-        <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
+      {isImage ? (
+        <img src={imgSrc} alt={book.title} className="w-full h-full object-cover" />
       ) : (
-        <div className="flex h-full flex-col items-center justify-center p-3 text-center text-ink-soft">
-          <div className="font-display font-700 leading-tight line-clamp-3">{book.title}</div>
+        <div className={`flex h-full flex-col items-center justify-center p-3 text-center text-paper font-display bg-gradient-to-br ${book.cover || "from-forest to-forest-deep"}`}>
+          <div className="font-700 leading-tight line-clamp-3 text-lg">{book.title}</div>
+          <div className="text-xs opacity-80 mt-1 line-clamp-1">{book.author}</div>
         </div>
       )}
     </div>
@@ -154,5 +140,22 @@ export function Stars({ value }: { value: number }) {
       <Icon.star className="w-4 h-4" />
       <span className="text-sm font-800 text-ink">{value.toFixed(1)}</span>
     </span>
+  );
+}
+
+/* ---------- Modal overlay ---------- */
+export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <h3 className="font-display text-xl font-800 text-ink">{title}</h3>
+          <button onClick={onClose} className="rounded-full p-1.5 text-ink-soft hover:bg-paper-2 hover:text-ink transition font-800">
+            ✕
+          </button>
+        </div>
+        <div>{children}</div>
+      </div>
+    </div>
   );
 }
