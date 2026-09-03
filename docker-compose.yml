@@ -18,3 +18,21 @@ services:
       - NODE_ENV=development
       # Polling mungkin diperlukan untuk hot-reload jika Anda menggunakan Windows/WSL
       - CHOKIDAR_USEPOLLING=true
+
+  server:
+    build:
+      context: ./server
+      target: development
+    ports:
+      - "5050:5050"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=5050
+      # Asumsi database berjalan secara lokal (host)
+      - DATABASE_URL=mysql://root:@host.docker.internal:3306/library_kancil?schema=public
+    # Menghubungkan host localhost agar docker container bisa akses mysql di host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

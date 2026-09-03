@@ -3,9 +3,9 @@
 Sistem Informasi Manajemen Perpustakaan (Library Management System) berbasis Web. Dibangun menggunakan teknologi modern dengan performa tinggi.
 
 ## Teknologi yang Digunakan
-- **Frontend**: React 19 + TypeScript
-- **Styling**: Tailwind CSS v4
-- **Build Tool**: Vite 8
+- **Frontend**: React 19 + TypeScript, Tailwind CSS v4, Vite 8
+- **Backend**: Node.js, Express, Prisma ORM
+- **Database**: MySQL
 - **Package Manager**: pnpm
 
 ---
@@ -30,19 +30,23 @@ Metode ini memastikan seluruh anggota tim menggunakan sistem dan konfigurasi yan
    cd "Library Management System"
    ```
 
-2. **Jalankan Aplikasi:**
+2. **Siapkan Database MySQL Lokal:**
+   Pastikan Anda memiliki database MySQL (melalui XAMPP, Laragon, dll.) yang berjalan di komputer lokal Anda dengan nama database sesuai konfigurasi.
+
+3. **Jalankan Aplikasi (Frontend & Backend):**
    ```bash
-   docker compose up -d
+   docker-compose up -d --build
    ```
 
-3. **Akses Aplikasi:**
-   Buka browser Anda dan kunjungi `http://localhost:5173` atau `http://localhost:8443`.
+4. **Akses Aplikasi:**
+   - **Frontend**: Kunjungi `http://localhost:5173` atau `http://localhost:8443`
+   - **Backend API**: Berjalan di `http://localhost:5050`
    
-   > 💡 **Info:** Sistem *Hot Reload* sudah aktif. Jika Anda mengubah kode di dalam folder `src/`, tampilan di browser akan otomatis berubah tanpa perlu me-restart Docker.
+   > 💡 **Info:** Sistem *Hot Reload* sudah aktif. Jika Anda mengubah kode di dalam folder `src/` atau `server/`, tampilan dan logika akan otomatis diperbarui.
 
-4. **Mematikan Aplikasi:**
+5. **Mematikan Aplikasi:**
    ```bash
-   docker compose down
+   docker-compose down
    ```
 
 ---
@@ -51,19 +55,24 @@ Metode ini memastikan seluruh anggota tim menggunakan sistem dan konfigurasi yan
 
 Jika Anda ingin menjalankannya secara lokal tanpa Docker:
 
-1. **Install Dependencies:**
+1. **Install Dependencies (Frontend & Backend):**
    ```bash
+   # Di folder utama (Frontend)
    pnpm install
+   
+   # Buka tab terminal baru, masuk ke folder server (Backend)
+   cd server
+   npm install
+   npx prisma generate
    ```
 
 2. **Jalankan Development Server:**
    ```bash
+   # Di tab terminal utama (Frontend)
    pnpm run dev
-   ```
-
-3. **Build untuk Production:**
-   ```bash
-   pnpm run build
+   
+   # Di tab terminal server (Backend)
+   npm run dev
    ```
 
 ---
