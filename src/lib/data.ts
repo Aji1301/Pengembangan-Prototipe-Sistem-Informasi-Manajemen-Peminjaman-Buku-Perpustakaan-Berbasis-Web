@@ -24,8 +24,21 @@ export type Member = {
   role: "Siswa" | "Guru";
   kelas: string; // class or subject
   email: string;
+  password?: string;
   activeLoans: number;
 };
+
+const ANIMAL_NAMES = [
+  "kancil", "rusa", "merak", "elang", "harimau", "gajah",
+  "kuda", "beruang", "kucing", "kelinci", "bangau", "rajawali",
+  "domba", "singa", "panda", "lumba", "burung", "zebra",
+];
+
+export function generatePassword(): string {
+  const animal = ANIMAL_NAMES[Math.floor(Math.random() * ANIMAL_NAMES.length)];
+  const digits = Math.floor(100 + Math.random() * 900); // 3 digit (100-999)
+  return `${animal}${digits}`;
+}
 
 export type LoanStatus = "Dipinjam" | "Dikembalikan" | "Terlambat";
 
@@ -39,15 +52,17 @@ export type Loan = {
   status: LoanStatus;
 };
 
-export const CATEGORIES: { name: string; emoji: string }[] = [];
-
-const covers = [
-  "from-forest to-forest-deep",
-  "from-amber to-berry",
-  "from-sky to-forest",
-  "from-berry to-amber",
-  "from-forest-deep to-sky",
-  "from-amber to-forest",
+export const CATEGORIES: { name: string; emoji: string }[] = [
+  { name: "Fiksi", emoji: "📖" },
+  { name: "Non-Fiksi", emoji: "📚" },
+  { name: "Sains", emoji: "🔬" },
+  { name: "Sejarah", emoji: "🏛️" },
+  { name: "Matematika", emoji: "🔢" },
+  { name: "Bahasa", emoji: "🗣️" },
+  { name: "Agama", emoji: "🕌" },
+  { name: "Seni & Budaya", emoji: "🎨" },
+  { name: "Teknologi", emoji: "💻" },
+  { name: "Ensiklopedia", emoji: "📕" },
 ];
 
 export const BOOKS: Book[] = [];

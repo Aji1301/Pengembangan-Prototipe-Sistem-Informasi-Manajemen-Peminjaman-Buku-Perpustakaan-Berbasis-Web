@@ -360,7 +360,6 @@ function History() {
 /* ---------------- Profile ---------------- */
 function Profile({ onLogout }: { onLogout: () => void }) {
   const u = CURRENT_USER;
-  const [edit, setEdit] = useState(false);
   const active = LOANS.filter((l) => l.memberId === u.id && l.returnDate === null).length;
   const total = LOANS.filter((l) => l.memberId === u.id).length;
 
@@ -386,21 +385,13 @@ function Profile({ onLogout }: { onLogout: () => void }) {
         </div>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field label="Nama Lengkap"><input className={inputCls} defaultValue={u.name} disabled={!edit} /></Field>
+          <Field label="Nama Lengkap"><input className={inputCls} defaultValue={u.name} disabled /></Field>
           <Field label="NIS / NIP"><input className={inputCls} defaultValue={u.idNumber} disabled /></Field>
-          <Field label="Kelas / Status"><input className={inputCls} defaultValue={u.kelas} disabled={!edit} /></Field>
-          <Field label="Email"><input className={inputCls} defaultValue={u.email} disabled={!edit} /></Field>
+          <Field label="Kelas / Status"><input className={inputCls} defaultValue={u.kelas} disabled /></Field>
+          <Field label="Email"><input className={inputCls} defaultValue={u.email} disabled /></Field>
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {edit ? (
-            <>
-              <Button onClick={() => setEdit(false)}><Icon.check className="w-5 h-5" /> Simpan Perubahan</Button>
-              <Button variant="ghost" onClick={() => setEdit(false)}>Batal</Button>
-            </>
-          ) : (
-            <Button variant="outline" onClick={() => setEdit(true)}><Icon.edit className="w-5 h-5" /> Edit Profil</Button>
-          )}
           <Button variant="danger" onClick={onLogout} className="ml-auto"><Icon.logout className="w-5 h-5" /> Logout</Button>
         </div>
       </Card>

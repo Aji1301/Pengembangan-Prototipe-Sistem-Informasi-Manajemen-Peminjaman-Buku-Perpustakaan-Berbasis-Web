@@ -1,8 +1,9 @@
 import { useState } from "react";
 import {
   BOOKS, MEMBERS, LOANS, CATEGORIES, bookById, memberById,
-  formatDate, daysUntil,
+  formatDate, daysUntil, generatePassword,
 } from "../lib/data";
+import type { Member, Book, Loan } from "../lib/data";
 import { Logo, Icon, Button, Card, StatusBadge, inputCls, Field } from "./ui";
 
 type View = "dashboard" | "books" | "members" | "loans" | "returns" | "reports";
@@ -144,8 +145,9 @@ function Dashboard({ goto }: { goto: (v: View) => void }) {
           <div className="mt-4 space-y-3">
             {late.length === 0 && <p className="text-sm text-ink-soft">Tidak ada keterlambatan. 🎉</p>}
             {late.map((l) => {
-              const b = bookById(l.bookId)!;
-              const m = memberById(l.memberId)!;
+              const b = bookById(l.bookId);
+              const m = memberById(l.memberId);
+              if (!b || !m) return null;
               return (
                 <div key={l.id} className="flex items-center gap-3 rounded-xl bg-danger/[0.06] p-3">
                   {b.cover ? <img src={b.cover} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover bg-paper-2" /> : <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-soft text-xs">{b.title[0]}</span>}
@@ -170,14 +172,68 @@ function Dashboard({ goto }: { goto: (v: View) => void }) {
 function BooksManager() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Semua");
-  const [showAdd, setShowAdd] = useState(false);
+  const [books, setBooks] = useState<Book[]>([...BOOKS]);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Book | null>(null);
   const [cover, setCover] = useState<string | null>(null);
+
+  // Form state
+  const [fTitle, setFTitle] = useState("");
+  const [fAuthor, setFAuthor] = useState("");
+  const [fPublisher, setFPublisher] = useState("");
+  const [fYear, setFYear] = useState("");
+  const [fCategory, setFCategory] = useState(CATEGORIES[0]?.name ?? "");
+  const [fCopies, setFCopies] = useState("");
+  const [fDesc, setFDesc] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const cats = ["Semua", ...CATEGORIES.map((c) => c.name)];
 
-  function closeAdd() {
-    setShowAdd(false);
+  const rows = books.filter((b) => {
+    const okC = cat === "Semua" || b.category === cat;
+    const okQ = !q || b.title.toLowerCase().includes(q.toLowerCase()) || b.author.toLowerCase().includes(q.toLowerCase());
+    return okC && okQ;
+  });
+
+  function resetForm() {
+    setFTitle("");
+    setFAuthor("");
+    setFPublisher("");
+    setFYear("");
+    setFCategory(CATEGORIES[0]?.name ?? "");
+    setFCopies("");
+    setFDesc("");
     setCover(null);
+    setErrors({});
+    setEditingId(null);
   }
+
+  function openAdd() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEdit(book: Book) {
+    setEditingId(book.id);
+    setFTitle(book.title);
+    setFAuthor(book.author);
+    setFPublisher(book.publisher);
+    setFYear(String(book.year));
+    setFCategory(book.category);
+    setFCopies(String(book.copies));
+    setFDesc(book.description);
+    setCover(book.cover || null);
+    setErrors({});
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setCover(null);
+    setErrors({});
+  }
+
   function onPickCover(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -186,15 +242,73 @@ function BooksManager() {
     reader.onload = () => setCover(reader.result as string);
     reader.readAsDataURL(file);
   }
-  const rows = BOOKS.filter((b) => {
-    const okC = cat === "Semua" || b.category === cat;
-    const okQ = !q || b.title.toLowerCase().includes(q.toLowerCase()) || b.author.toLowerCase().includes(q.toLowerCase());
-    return okC && okQ;
-  });
+
+  function handleSubmit() {
+    const newErrors: Record<string, string> = {};
+    if (!fTitle.trim()) newErrors.title = "Judul buku wajib diisi.";
+    if (!fAuthor.trim()) newErrors.author = "Penulis wajib diisi.";
+    if (!fPublisher.trim()) newErrors.publisher = "Penerbit wajib diisi.";
+    if (!fYear.trim()) newErrors.year = "Tahun terbit wajib diisi.";
+    if (!fCopies.trim()) newErrors.copies = "Jumlah eksemplar wajib diisi.";
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    if (editingId) {
+      const updated = books.map((b) => {
+        if (b.id !== editingId) return b;
+        const newCopies = parseInt(fCopies) || b.copies;
+        const borrowedCount = b.copies - b.available;
+        return {
+          ...b,
+          title: fTitle.trim(),
+          author: fAuthor.trim(),
+          publisher: fPublisher.trim(),
+          year: parseInt(fYear) || b.year,
+          category: fCategory || b.category,
+          copies: newCopies,
+          available: Math.max(0, newCopies - borrowedCount),
+          description: fDesc.trim(),
+          cover: cover || "",
+        };
+      });
+      setBooks(updated);
+      const idx = BOOKS.findIndex((b) => b.id === editingId);
+      if (idx !== -1) BOOKS[idx] = updated.find((b) => b.id === editingId)!;
+    } else {
+      const copies = parseInt(fCopies) || 1;
+      const newBook: Book = {
+        id: `b-${Date.now()}`,
+        title: fTitle.trim(),
+        author: fAuthor.trim(),
+        publisher: fPublisher.trim(),
+        year: parseInt(fYear) || 2026,
+        category: fCategory || CATEGORIES[0]?.name || "Umum",
+        cover: cover || "",
+        status: "Tersedia",
+        description: fDesc.trim(),
+        copies,
+        available: copies,
+        rating: 0,
+        popularity: 0,
+      };
+      BOOKS.unshift(newBook);
+      setBooks([newBook, ...books]);
+    }
+
+    closeForm();
+  }
+
+  function handleDelete(book: Book) {
+    const idx = BOOKS.findIndex((b) => b.id === book.id);
+    if (idx !== -1) BOOKS.splice(idx, 1);
+    setBooks(books.filter((b) => b.id !== book.id));
+    setConfirmDelete(null);
+  }
 
   return (
     <div className="space-y-6">
-      <PageHead title="Kelola Data Buku" desc={`${BOOKS.length} judul dalam koleksi.`} action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
+      <PageHead title="Kelola Data Buku" desc={`${books.length} judul dalam koleksi.`} action={<Button onClick={openAdd}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={q} onChange={setQ} placeholder="Cari judul atau penulis…" />
@@ -205,6 +319,7 @@ function BooksManager() {
 
       <Card className="overflow-hidden">
         <TableHead cols={["Buku", "Kategori", "Tahun", "Stok", "Status", ""]} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]" />
+        {rows.length === 0 && <div className="p-10 text-center text-ink-soft">Belum ada data buku. Klik "Tambah Buku" untuk menambahkan.</div>}
         {rows.map((b) => (
           <Row key={b.id} widths="grid-cols-[2.4fr_1.2fr_.7fr_.8fr_1fr_.8fr]">
             <div className="flex items-center gap-3">
@@ -216,15 +331,15 @@ function BooksManager() {
             <span className="text-sm font-700">{b.available}/{b.copies}</span>
             <StatusBadge status={b.available > 0 ? "Tersedia" : "Dipinjam"} />
             <div className="flex gap-1">
-              <IconBtn icon="edit" label="Edit" />
-              <IconBtn icon="trash" label="Hapus" danger />
+              <IconBtn icon="edit" label="Edit" onClick={() => openEdit(b)} />
+              <IconBtn icon="trash" label="Hapus" danger onClick={() => setConfirmDelete(b)} />
             </div>
           </Row>
         ))}
       </Card>
 
-      {showAdd && (
-        <Modal title="Tambah Buku Baru" onClose={closeAdd}>
+      {showForm && (
+        <Modal title={editingId ? "Edit Buku" : "Tambah Buku Baru"} onClose={closeForm}>
           <div className="grid gap-5 sm:grid-cols-[150px_1fr]">
             {/* Cover uploader */}
             <div>
@@ -253,22 +368,48 @@ function BooksManager() {
 
             {/* Fields */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2"><Field label="Judul Buku"><input className={inputCls} placeholder="Masukkan judul" /></Field></div>
-              <Field label="Penulis"><input className={inputCls} placeholder="Nama penulis" /></Field>
-              <Field label="Penerbit"><input className={inputCls} placeholder="Nama penerbit" /></Field>
-              <Field label="Tahun Terbit"><input className={inputCls} placeholder="2026" /></Field>
+              <div className="sm:col-span-2">
+                <Field label="Judul Buku"><input className={`${inputCls} ${errors.title ? "border-danger" : ""}`} placeholder="Masukkan judul" value={fTitle} onChange={(e) => setFTitle(e.target.value)} /></Field>
+                {errors.title && <span className="block text-xs text-danger mt-1">{errors.title}</span>}
+              </div>
+              <div>
+                <Field label="Penulis"><input className={`${inputCls} ${errors.author ? "border-danger" : ""}`} placeholder="Nama penulis" value={fAuthor} onChange={(e) => setFAuthor(e.target.value)} /></Field>
+                {errors.author && <span className="block text-xs text-danger mt-1">{errors.author}</span>}
+              </div>
+              <div>
+                <Field label="Penerbit"><input className={`${inputCls} ${errors.publisher ? "border-danger" : ""}`} placeholder="Nama penerbit" value={fPublisher} onChange={(e) => setFPublisher(e.target.value)} /></Field>
+                {errors.publisher && <span className="block text-xs text-danger mt-1">{errors.publisher}</span>}
+              </div>
+              <div>
+                <Field label="Tahun Terbit"><input className={`${inputCls} ${errors.year ? "border-danger" : ""}`} placeholder="2026" value={fYear} onChange={(e) => setFYear(e.target.value)} /></Field>
+                {errors.year && <span className="block text-xs text-danger mt-1">{errors.year}</span>}
+              </div>
               <Field label="Kategori">
-                <select className={inputCls}>{CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}</select>
+                <select className={inputCls} value={fCategory} onChange={(e) => setFCategory(e.target.value)}>
+                  {CATEGORIES.map((c) => <option key={c.name}>{c.name}</option>)}
+                </select>
               </Field>
-              <div className="sm:col-span-2"><Field label="Jumlah Eksemplar"><input className={inputCls} placeholder="3" /></Field></div>
-              <div className="sm:col-span-2"><Field label="Deskripsi"><textarea className={`${inputCls} min-h-24`} placeholder="Ringkasan buku…" /></Field></div>
+              <div className="sm:col-span-2">
+                <Field label="Jumlah Eksemplar"><input className={`${inputCls} ${errors.copies ? "border-danger" : ""}`} placeholder="3" value={fCopies} onChange={(e) => setFCopies(e.target.value)} /></Field>
+                {errors.copies && <span className="block text-xs text-danger mt-1">{errors.copies}</span>}
+              </div>
+              <div className="sm:col-span-2"><Field label="Deskripsi"><textarea className={`${inputCls} min-h-24`} placeholder="Ringkasan buku…" value={fDesc} onChange={(e) => setFDesc(e.target.value)} /></Field></div>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">
-            <Button variant="ghost" onClick={closeAdd}>Batal</Button>
-            <Button onClick={closeAdd}><Icon.check className="w-5 h-5" /> Simpan Buku</Button>
+            <Button variant="ghost" onClick={closeForm}>Batal</Button>
+            <Button onClick={handleSubmit}><Icon.check className="w-5 h-5" /> {editingId ? "Simpan Perubahan" : "Simpan Buku"}</Button>
           </div>
         </Modal>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Hapus Buku"
+          message={`Yakin ingin menghapus buku "${confirmDelete.title}"? Data yang sudah dihapus tidak dapat dikembalikan.`}
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   );
@@ -278,16 +419,151 @@ function BooksManager() {
 function MembersManager() {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("Semua");
-  const [showAdd, setShowAdd] = useState(false);
-  const rows = MEMBERS.filter((m) => {
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Member | null>(null);
+  const [members, setMembers] = useState<Member[]>([...MEMBERS]);
+
+  // Form state
+  const [formNama, setFormNama] = useState("");
+  const [formNis, setFormNis] = useState("");
+  const [formPeran, setFormPeran] = useState<"Siswa" | "Guru">("Siswa");
+  const [formKelas, setFormKelas] = useState("");
+  const [formEmail, setFormEmail] = useState("");
+  const [formPassword, setFormPassword] = useState(() => generatePassword());
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Success banner
+  const [successInfo, setSuccessInfo] = useState<{ name: string; email: string; password: string } | null>(null);
+
+  const rows = members.filter((m) => {
     const okR = role === "Semua" || m.role === role;
     const okQ = !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.idNumber.includes(q);
     return okR && okQ;
   });
 
+  function resetForm() {
+    setFormNama("");
+    setFormNis("");
+    setFormPeran("Siswa");
+    setFormKelas("");
+    setFormEmail("");
+    setFormPassword(generatePassword());
+    setErrors({});
+    setEditingId(null);
+  }
+
+  function openAdd() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  function openEdit(member: Member) {
+    setEditingId(member.id);
+    setFormNama(member.name);
+    setFormNis(member.idNumber);
+    setFormPeran(member.role);
+    setFormKelas(member.kelas);
+    setFormEmail(member.email);
+    setFormPassword(member.password || "");
+    setErrors({});
+    setShowForm(true);
+  }
+
+  function closeForm() {
+    setShowForm(false);
+    setErrors({});
+  }
+
+  function handleSubmit() {
+    const newErrors: Record<string, string> = {};
+
+    if (!formNama.trim()) newErrors.nama = "Nama lengkap wajib diisi.";
+    if (!formNis.trim()) newErrors.nis = "NIS / NIP wajib diisi.";
+    if (!formKelas.trim()) newErrors.kelas = formPeran === "Siswa" ? "Kelas wajib diisi." : "Mata pelajaran wajib diisi.";
+    if (!formEmail.trim()) newErrors.email = "Email / Username wajib diisi.";
+    if (!formPassword.trim()) newErrors.password = "Kata sandi wajib diisi.";
+
+    // Check NIS/NIP duplicate (exclude self when editing)
+    if (formNis.trim()) {
+      const duplicate = members.find((m) => m.idNumber === formNis.trim() && m.id !== editingId);
+      if (duplicate) newErrors.nis = "NIS / NIP sudah terdaftar. Gunakan nomor lain.";
+    }
+
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    if (editingId) {
+      // Update existing member
+      const updated = members.map((m) => {
+        if (m.id !== editingId) return m;
+        return {
+          ...m,
+          name: formNama.trim(),
+          idNumber: formNis.trim(),
+          role: formPeran,
+          kelas: formKelas.trim(),
+          email: formEmail.trim(),
+          password: formPassword.trim(),
+        };
+      });
+      setMembers(updated);
+      const idx = MEMBERS.findIndex((m) => m.id === editingId);
+      if (idx !== -1) MEMBERS[idx] = updated.find((m) => m.id === editingId)!;
+    } else {
+      // Create new member
+      const newMember: Member = {
+        id: `m-${Date.now()}`,
+        name: formNama.trim(),
+        idNumber: formNis.trim(),
+        role: formPeran,
+        kelas: formKelas.trim(),
+        email: formEmail.trim(),
+        password: formPassword.trim(),
+        activeLoans: 0,
+      };
+
+      MEMBERS.unshift(newMember);
+      setMembers([newMember, ...members]);
+
+      setSuccessInfo({
+        name: newMember.name,
+        email: newMember.email,
+        password: formPassword.trim(),
+      });
+    }
+
+    closeForm();
+  }
+
+  function handleDelete(member: Member) {
+    const idx = MEMBERS.findIndex((m) => m.id === member.id);
+    if (idx !== -1) MEMBERS.splice(idx, 1);
+    setMembers(members.filter((m) => m.id !== member.id));
+    setConfirmDelete(null);
+  }
+
   return (
     <div className="space-y-6">
-      <PageHead title="Kelola Data Anggota" desc={`${MEMBERS.length} anggota terdaftar.`} action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Anggota</Button>} />
+      <PageHead title="Kelola Data Anggota" desc={`${members.length} anggota terdaftar.`} action={<Button onClick={openAdd}><Icon.plus className="w-5 h-5" /> Buat Akun Anggota</Button>} />
+
+      {/* Success banner */}
+      {successInfo && (
+        <div className="flex items-start gap-3 rounded-2xl border border-[#b1d23a]/40 bg-[#eef5d6] p-4 shadow-sm">
+          <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#6fa32a] text-white">
+            <Icon.check className="w-5 h-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-700 text-[#3c4b62]">Akun berhasil dibuat untuk <b>{successInfo.name}</b></p>
+            <p className="mt-1 text-sm text-[#6f7c92]">Bagikan kredensial berikut kepada anggota agar bisa login:</p>
+            <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 rounded-xl bg-white/70 px-4 py-2.5 text-sm font-700">
+              <span>📧 Email: <b className="text-[#0a96e6]">{successInfo.email}</b></span>
+              <span>🔑 Kata Sandi: <b className="text-[#0a96e6]">{successInfo.password}</b></span>
+            </div>
+          </div>
+          <button onClick={() => setSuccessInfo(null)} className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[#6f7c92] hover:bg-white/80" aria-label="Tutup">✕</button>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <SearchInput value={q} onChange={setQ} placeholder="Cari nama atau NIS/NIP…" />
@@ -298,6 +574,7 @@ function MembersManager() {
 
       <Card className="overflow-hidden">
         <TableHead cols={["Anggota", "NIS / NIP", "Kelas / Status", "Pinjaman Aktif", ""]} widths="grid-cols-[2fr_1fr_1.3fr_1fr_.8fr]" />
+        {rows.length === 0 && <div className="p-10 text-center text-ink-soft">Belum ada data anggota. Klik "Buat Akun Anggota" untuk menambahkan.</div>}
         {rows.map((m) => (
           <Row key={m.id} widths="grid-cols-[2fr_1fr_1.3fr_1fr_.8fr]">
             <div className="flex items-center gap-3">
@@ -307,25 +584,77 @@ function MembersManager() {
             <span className="text-sm">{m.idNumber}</span>
             <span className="text-sm text-ink-soft">{m.role} · {m.kelas}</span>
             <span className="text-sm"><b>{m.activeLoans}</b> buku</span>
-            <div className="flex gap-1"><IconBtn icon="edit" label="Edit" /><IconBtn icon="trash" label="Hapus" danger /></div>
+            <div className="flex gap-1">
+              <IconBtn icon="edit" label="Edit" onClick={() => openEdit(m)} />
+              <IconBtn icon="trash" label="Hapus" danger onClick={() => setConfirmDelete(m)} />
+            </div>
           </Row>
         ))}
       </Card>
 
-      {showAdd && (
-        <Modal title="Tambah Anggota" onClose={() => setShowAdd(false)}>
+      {showForm && (
+        <Modal title={editingId ? "Edit Anggota" : "Buat Akun Anggota"} onClose={closeForm}>
+          {!editingId && <p className="text-sm text-ink-soft -mt-3 mb-5">Buatkan akun login untuk siswa atau guru. Kredensial akan ditampilkan setelah akun dibuat.</p>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2"><Field label="Nama Lengkap"><input className={inputCls} /></Field></div>
-            <Field label="NIS / NIP"><input className={inputCls} /></Field>
-            <Field label="Peran"><select className={inputCls}><option>Siswa</option><option>Guru</option></select></Field>
-            <Field label="Kelas / Status"><input className={inputCls} placeholder="5A / Guru IPA" /></Field>
-            <Field label="Email"><input className={inputCls} /></Field>
+            <div className="sm:col-span-2">
+              <Field label="Nama Lengkap">
+                <input className={`${inputCls} ${errors.nama ? "border-danger" : ""}`} placeholder="Kirana Ayu Pratiwi" value={formNama} onChange={(e) => setFormNama(e.target.value)} />
+              </Field>
+              {errors.nama && <span className="block text-xs text-danger mt-1">{errors.nama}</span>}
+            </div>
+            <div>
+              <Field label="NIS / NIP">
+                <input className={`${inputCls} ${errors.nis ? "border-danger" : ""}`} placeholder="20240115" value={formNis} onChange={(e) => setFormNis(e.target.value)} />
+              </Field>
+              {errors.nis && <span className="block text-xs text-danger mt-1">{errors.nis}</span>}
+            </div>
+            <Field label="Peran">
+              <select className={inputCls} value={formPeran} onChange={(e) => setFormPeran(e.target.value as "Siswa" | "Guru")}>
+                <option>Siswa</option><option>Guru</option>
+              </select>
+            </Field>
+            <div>
+              <Field label={formPeran === "Siswa" ? "Kelas" : "Mata Pelajaran / Status"}>
+                <input className={`${inputCls} ${errors.kelas ? "border-danger" : ""}`} placeholder={formPeran === "Siswa" ? "5A" : "Guru IPA"} value={formKelas} onChange={(e) => setFormKelas(e.target.value)} />
+              </Field>
+              {errors.kelas && <span className="block text-xs text-danger mt-1">{errors.kelas}</span>}
+            </div>
+            <div>
+              <Field label="Email / Username">
+                <input className={`${inputCls} ${errors.email ? "border-danger" : ""}`} placeholder="kirana@kancil.sch.id" value={formEmail} onChange={(e) => setFormEmail(e.target.value)} />
+              </Field>
+              {errors.email && <span className="block text-xs text-danger mt-1">{errors.email}</span>}
+            </div>
+            <div className="sm:col-span-2">
+              <Field label="Kata Sandi">
+                <div className="flex gap-2">
+                  <input className={`${inputCls} flex-1 ${errors.password ? "border-danger" : ""}`} placeholder="rusa744" value={formPassword} onChange={(e) => setFormPassword(e.target.value)} />
+                  <button
+                    type="button"
+                    onClick={() => setFormPassword(generatePassword())}
+                    className="inline-flex items-center gap-1.5 shrink-0 rounded-2xl border-2 border-border bg-card px-4 py-2.5 text-sm font-700 text-ink transition hover:border-forest hover:text-forest active:scale-[0.97]"
+                  >
+                    <Icon.refresh className="w-4 h-4" /> Acak
+                  </button>
+                </div>
+              </Field>
+              {errors.password && <span className="block text-xs text-danger mt-1">{errors.password}</span>}
+            </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">
-            <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
-            <Button onClick={() => setShowAdd(false)}><Icon.check className="w-5 h-5" /> Simpan</Button>
+            <Button variant="ghost" onClick={closeForm}>Batal</Button>
+            <Button onClick={handleSubmit}><Icon.check className="w-5 h-5" /> {editingId ? "Simpan Perubahan" : "Buat Akun"}</Button>
           </div>
         </Modal>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Hapus Anggota"
+          message={`Yakin ingin menghapus anggota "${confirmDelete.name}"? Data yang sudah dihapus tidak dapat dikembalikan.`}
+          onConfirm={() => handleDelete(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+        />
       )}
     </div>
   );
@@ -335,11 +664,70 @@ function MembersManager() {
 function LoansManager() {
   const [showAdd, setShowAdd] = useState(false);
   const [filter, setFilter] = useState("Semua");
-  const rows = LOANS.filter((l) => filter === "Semua" || l.status === filter);
+  const [loans, setLoans] = useState<Loan[]>([...LOANS]);
+
+  // Form state
+  const [fMemberId, setFMemberId] = useState("");
+  const [fBookId, setFBookId] = useState("");
+  const [fBorrowDate, setFBorrowDate] = useState(new Date().toISOString().slice(0, 10));
+  const [fDueDate, setFDueDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  });
+  const [loanErrors, setLoanErrors] = useState<Record<string, string>>({});
+
+  const rows = loans.filter((l) => filter === "Semua" || l.status === filter);
+
+  function openAdd() {
+    setFMemberId(MEMBERS[0]?.id ?? "");
+    const availableBooks = BOOKS.filter((b) => b.available > 0);
+    setFBookId(availableBooks[0]?.id ?? "");
+    setLoanErrors({});
+    setShowAdd(true);
+  }
+
+  function handleLoanSubmit() {
+    const newErrors: Record<string, string> = {};
+    if (!fMemberId) newErrors.member = "Pilih anggota.";
+    if (!fBookId) newErrors.book = "Pilih buku.";
+    if (!fBorrowDate) newErrors.borrow = "Tanggal pinjam wajib diisi.";
+    if (!fDueDate) newErrors.due = "Batas kembali wajib diisi.";
+
+    setLoanErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    const newLoan: Loan = {
+      id: `l-${Date.now()}`,
+      bookId: fBookId,
+      memberId: fMemberId,
+      borrowDate: fBorrowDate,
+      dueDate: fDueDate,
+      returnDate: null,
+      status: "Dipinjam",
+    };
+
+    // Update book availability
+    const book = BOOKS.find((b) => b.id === fBookId);
+    if (book && book.available > 0) {
+      book.available -= 1;
+      if (book.available === 0) book.status = "Dipinjam";
+    }
+
+    // Update member active loans
+    const member = MEMBERS.find((m) => m.id === fMemberId);
+    if (member) {
+      member.activeLoans += 1;
+    }
+
+    LOANS.unshift(newLoan);
+    setLoans([newLoan, ...loans]);
+    setShowAdd(false);
+  }
 
   return (
     <div className="space-y-6">
-      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku." action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
+      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku." action={<Button onClick={openAdd}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
 
       <div className="flex flex-wrap gap-2">
         {["Semua", "Dipinjam", "Terlambat", "Dikembalikan"].map((f) => (
@@ -349,8 +737,11 @@ function LoansManager() {
 
       <Card className="overflow-hidden">
         <TableHead cols={["Anggota", "Buku", "Tgl Pinjam", "Batas Kembali", "Status"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]" />
+        {rows.length === 0 && <div className="p-10 text-center text-ink-soft">Belum ada data peminjaman.</div>}
         {rows.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
+          const b = bookById(l.bookId);
+          const m = memberById(l.memberId);
+          if (!b || !m) return null;
           return (
             <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]">
               <div className="min-w-0"><p className="truncate font-700">{m.name}</p><p className="text-xs text-ink-soft">{m.role} · {m.kelas}</p></div>
@@ -366,16 +757,32 @@ function LoansManager() {
       {showAdd && (
         <Modal title="Tambah Peminjaman" onClose={() => setShowAdd(false)}>
           <div className="grid gap-4">
-            <Field label="Anggota"><select className={inputCls}>{MEMBERS.map((m) => <option key={m.id}>{m.name} — {m.idNumber}</option>)}</select></Field>
-            <Field label="Buku"><select className={inputCls}>{BOOKS.filter((b) => b.available > 0).map((b) => <option key={b.id}>{b.title}</option>)}</select></Field>
+            <div>
+              <Field label="Anggota">
+                <select className={`${inputCls} ${loanErrors.member ? "border-danger" : ""}`} value={fMemberId} onChange={(e) => setFMemberId(e.target.value)}>
+                  {MEMBERS.length === 0 && <option value="">— Belum ada anggota —</option>}
+                  {MEMBERS.map((m) => <option key={m.id} value={m.id}>{m.name} — {m.idNumber}</option>)}
+                </select>
+              </Field>
+              {loanErrors.member && <span className="block text-xs text-danger mt-1">{loanErrors.member}</span>}
+            </div>
+            <div>
+              <Field label="Buku">
+                <select className={`${inputCls} ${loanErrors.book ? "border-danger" : ""}`} value={fBookId} onChange={(e) => setFBookId(e.target.value)}>
+                  {BOOKS.filter((b) => b.available > 0).length === 0 && <option value="">— Tidak ada buku tersedia —</option>}
+                  {BOOKS.filter((b) => b.available > 0).map((b) => <option key={b.id} value={b.id}>{b.title} ({b.available} tersedia)</option>)}
+                </select>
+              </Field>
+              {loanErrors.book && <span className="block text-xs text-danger mt-1">{loanErrors.book}</span>}
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="Tanggal Pinjam"><input type="date" className={inputCls} defaultValue="2026-08-30" /></Field>
-              <Field label="Batas Kembali"><input type="date" className={inputCls} defaultValue="2026-09-13" /></Field>
+              <Field label="Tanggal Pinjam"><input type="date" className={inputCls} value={fBorrowDate} onChange={(e) => setFBorrowDate(e.target.value)} /></Field>
+              <Field label="Batas Kembali"><input type="date" className={inputCls} value={fDueDate} onChange={(e) => setFDueDate(e.target.value)} /></Field>
             </div>
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
-            <Button onClick={() => setShowAdd(false)}><Icon.check className="w-5 h-5" /> Catat Peminjaman</Button>
+            <Button onClick={handleLoanSubmit}><Icon.check className="w-5 h-5" /> Catat Peminjaman</Button>
           </div>
         </Modal>
       )}
@@ -396,7 +803,9 @@ function ReturnsManager() {
         <TableHead cols={["Peminjam", "Buku", "Tgl Pinjam", "Batas Kembali", "Status", "Aksi"]} widths="grid-cols-[1.3fr_1.6fr_1fr_1fr_1fr_1.1fr]" />
         {rows.length === 0 && <div className="p-10 text-center text-ink-soft">Semua buku sudah dikembalikan. 🎉</div>}
         {rows.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
+          const b = bookById(l.bookId);
+          const m = memberById(l.memberId);
+          if (!b || !m) return null;
           const late = l.status === "Terlambat" || daysUntil(l.dueDate) < 0;
           return (
             <Row key={l.id} widths="grid-cols-[1.3fr_1.6fr_1fr_1fr_1fr_1.1fr]">
@@ -441,7 +850,9 @@ function Reports() {
       <Card className="overflow-hidden">
         <TableHead cols={["Anggota", "Buku", "Tgl Pinjam", tab === "kembali" ? "Tgl Kembali" : "Batas Kembali", "Status"]} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]" />
         {dataset.map((l) => {
-          const b = bookById(l.bookId)!; const m = memberById(l.memberId)!;
+          const b = bookById(l.bookId);
+          const m = memberById(l.memberId);
+          if (!b || !m) return null;
           return (
             <Row key={l.id} widths="grid-cols-[1.4fr_1.8fr_1fr_1fr_1fr]">
               <span className="truncate font-700">{m.name}</span>
@@ -495,10 +906,10 @@ function Row({ children, widths }: { children: React.ReactNode; widths: string }
   );
 }
 
-function IconBtn({ icon, label, danger }: { icon: keyof typeof Icon; label: string; danger?: boolean }) {
+function IconBtn({ icon, label, danger, onClick }: { icon: keyof typeof Icon; label: string; danger?: boolean; onClick?: () => void }) {
   const IconC = Icon[icon];
   return (
-    <button aria-label={label} title={label} className={`grid h-8 w-8 place-items-center rounded-lg transition ${danger ? "text-ink-soft hover:bg-danger/10 hover:text-danger" : "text-ink-soft hover:bg-forest-soft hover:text-forest"}`}>
+    <button aria-label={label} title={label} onClick={onClick} className={`grid h-8 w-8 place-items-center rounded-lg transition ${danger ? "text-ink-soft hover:bg-danger/10 hover:text-danger" : "text-ink-soft hover:bg-forest-soft hover:text-forest"}`}>
       <IconC className="w-4 h-4" />
     </button>
   );
@@ -526,6 +937,28 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
           <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full text-ink-soft hover:bg-paper-2" aria-label="Tutup">✕</button>
         </div>
         {children}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmDialog({ title, message, onConfirm, onCancel }: { title: string; message: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-forest-deep/40 p-4 backdrop-blur-sm" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-danger/10 text-danger">
+            <Icon.alert className="w-5 h-5" />
+          </span>
+          <div>
+            <h3 className="font-display text-lg font-700">{title}</h3>
+            <p className="mt-1 text-sm text-ink-soft">{message}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-3">
+          <Button variant="ghost" onClick={onCancel}>Batal</Button>
+          <Button variant="danger" onClick={onConfirm}><Icon.trash className="w-4 h-4" /> Ya, Hapus</Button>
+        </div>
       </div>
     </div>
   );
