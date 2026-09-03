@@ -1,31 +1,85 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma.js";
 
+let cachedBooks: any[] | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 60 * 1000; // 60 detik cache
+
+export const invalidateBooksCache = () => {
+  cachedBooks = null;
+  cacheTimestamp = 0;
+};
+
+export const prewarmBooksCache = async () => {
+  try {
+    const books = await prisma.book.findMany({
+      include: { category: true },
+      orderBy: { createdAt: "desc" },
+    });
+    cachedBooks = books;
+    cacheTimestamp = Date.now();
+    console.log(`⚡ Cache buku berhasil dimuat (${books.length} buku).`);
+  } catch (err: any) {
+    console.warn("⚠️ Gagal memuat cache awal buku:", err.message);
+  }
+};
+
 export const getBooks = async (req: Request, res: Response): Promise<void> => {
   try {
     const { search, categoryId } = req.query;
 
-    const where: any = {};
-    if (search) {
-      where.OR = [
-        { title: { contains: String(search) } },
-        { author: { contains: String(search) } },
-        { isbn: { contains: String(search) } },
-      ];
-    }
-    if (categoryId) {
-      where.categoryId = Number(categoryId);
+    const isCacheValid = cachedBooks !== null && Date.now() - cacheTimestamp < CACHE_TTL_MS;
+
+    // Jika cache masih valid, gunakan cache untuk respons super cepat (instant)
+    if (isCacheValid && cachedBooks) {
+      let result = cachedBooks;
+
+      if (search) {
+        const q = String(search).toLowerCase();
+        result = result.filter(
+          (b) =>
+            b.title?.toLowerCase().includes(q) ||
+            b.author?.toLowerCase().includes(q) ||
+            (b.isbn && b.isbn.toLowerCase().includes(q))
+        );
+      }
+
+      if (categoryId) {
+        const catId = Number(categoryId);
+        result = result.filter((b) => b.categoryId === catId);
+      }
+
+      res.json({ books: result, cached: true });
+      return;
     }
 
+    // Ambil dari database jika cache kosong atau kedaluwarsa
     const books = await prisma.book.findMany({
-      where,
       include: {
         category: true,
       },
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ books });
+    cachedBooks = books;
+    cacheTimestamp = Date.now();
+
+    let result = books;
+    if (search) {
+      const q = String(search).toLowerCase();
+      result = result.filter(
+        (b) =>
+          b.title?.toLowerCase().includes(q) ||
+          b.author?.toLowerCase().includes(q) ||
+          (b.isbn && b.isbn.toLowerCase().includes(q))
+      );
+    }
+    if (categoryId) {
+      const catId = Number(categoryId);
+      result = result.filter((b) => b.categoryId === catId);
+    }
+
+    res.json({ books: result });
   } catch (error: any) {
     res.status(500).json({ message: "Gagal mengambil data buku.", error: error.message });
   }
@@ -87,6 +141,7 @@ export const createBook = async (req: Request, res: Response): Promise<void> => 
       include: { category: true },
     });
 
+    invalidateBooksCache();
     res.status(201).json({ message: "Buku berhasil ditambahkan.", book });
   } catch (error: any) {
     res.status(500).json({ message: "Gagal menambahkan buku.", error: error.message });
@@ -131,6 +186,7 @@ export const updateBook = async (req: Request, res: Response): Promise<void> => 
       include: { category: true },
     });
 
+    invalidateBooksCache();
     res.json({ message: "Buku berhasil diperbarui.", book: updatedBook });
   } catch (error: any) {
     res.status(500).json({ message: "Gagal memperbarui buku.", error: error.message });
@@ -141,6 +197,7 @@ export const deleteBook = async (req: Request, res: Response): Promise<void> => 
   try {
     const id = Number(req.params.id);
     await prisma.book.delete({ where: { id } });
+    invalidateBooksCache();
     res.json({ message: "Buku berhasil dihapus." });
   } catch (error: any) {
     res.status(500).json({ message: "Gagal menghapus buku.", error: error.message });

@@ -54,33 +54,67 @@ export const api = {
   getMe: () => apiFetch<{ user: any }>("/auth/me"),
 
   // Books
-  getBooks: (search?: string, categoryId?: number) => {
+  getBooks: async (search?: string, categoryId?: number) => {
     const params = new URLSearchParams();
     if (search) params.append("search", search);
     if (categoryId) params.append("categoryId", String(categoryId));
     const query = params.toString() ? `?${params.toString()}` : "";
-    return apiFetch<{ books: any[] }>(`/books${query}`);
+
+    // Stale-While-Revalidate untuk load instant (0ms)
+    if (!query) {
+      const cached = localStorage.getItem("kancil_cached_books");
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          // Fetch latar belakang untuk memperbarui data
+          apiFetch<{ books: any[] }>("/books")
+            .then((res) => {
+              if (res && res.books) {
+                try {
+                  localStorage.setItem("kancil_cached_books", JSON.stringify(res.books));
+                } catch {}
+              }
+            })
+            .catch(() => {});
+          return { books: parsed };
+        } catch {}
+      }
+    }
+
+    const res = await apiFetch<{ books: any[] }>(`/books${query}`);
+    if (!query && res && res.books) {
+      try {
+        localStorage.setItem("kancil_cached_books", JSON.stringify(res.books));
+      } catch {}
+    }
+    return res;
   },
 
   getBookById: (id: number) => apiFetch<{ book: any }>(`/books/${id}`),
 
-  createBook: (bookData: any) =>
-    apiFetch<{ message: string; book: any }>("/books", {
+  createBook: async (bookData: any) => {
+    localStorage.removeItem("kancil_cached_books");
+    return apiFetch<{ message: string; book: any }>("/books", {
       method: "POST",
       body: JSON.stringify(bookData),
-    }),
+    });
+  },
 
-  updateBook: (id: number, bookData: any) =>
-    apiFetch<{ message: string; book: any }>(`/books/${id}`, {
+  updateBook: async (id: number, bookData: any) => {
+    localStorage.removeItem("kancil_cached_books");
+    return apiFetch<{ message: string; book: any }>(`/books/${id}`, {
       method: "PUT",
       body: JSON.stringify(bookData),
-    }),
+    });
+  },
 
-  deleteBook: (id: number) =>
-    apiFetch<{ message: string }>(`/books/${id}`, {
+  deleteBook: async (id: number) => {
+    localStorage.removeItem("kancil_cached_books");
+    return apiFetch<{ message: string }>(`/books/${id}`, {
       method: "DELETE",
       body: JSON.stringify({}),
-    }),
+    });
+  },
 
   // Borrowings
   requestBorrow: (data: { bookId: number; days?: number; notes?: string }) =>

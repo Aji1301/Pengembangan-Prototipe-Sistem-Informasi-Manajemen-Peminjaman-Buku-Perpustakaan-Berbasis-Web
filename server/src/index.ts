@@ -18,22 +18,35 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+import { prewarmBooksCache } from "./controllers/bookController.js";
+
 // Health Check
 app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "KANCIL Backend Service Running Successfully!" });
 });
 
+// Cache for stats
+let cachedStats: { booksCount: number; membersCount: number; categoriesCount: number } | null = null;
+let statsTimestamp = 0;
+
 // Public Stats Endpoint for Landing Page
 app.get("/api/stats", async (req, res) => {
   try {
-    const booksCount = await prisma.book.count();
-    const membersCount = await prisma.member.count();
-    const categoriesCount = await prisma.category.count();
-    res.json({
-      booksCount,
-      membersCount,
-      categoriesCount,
-    });
+    if (cachedStats && Date.now() - statsTimestamp < 60000) {
+      res.json(cachedStats);
+      return;
+    }
+
+    const [booksCount, membersCount, categoriesCount] = await Promise.all([
+      prisma.book.count(),
+      prisma.member.count(),
+      prisma.category.count(),
+    ]);
+
+    cachedStats = { booksCount, membersCount, categoriesCount };
+    statsTimestamp = Date.now();
+
+    res.json(cachedStats);
   } catch (error: any) {
     res.status(500).json({ booksCount: 0, membersCount: 0, categoriesCount: 0 });
   }
@@ -53,4 +66,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 app.listen(PORT, () => {
   console.log(`🚀 KANCIL Server running on http://localhost:${PORT}`);
+  prewarmBooksCache();
 });
+
