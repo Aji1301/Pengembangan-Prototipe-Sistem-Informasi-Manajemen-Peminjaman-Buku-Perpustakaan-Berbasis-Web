@@ -25,11 +25,11 @@ services:
       target: development
     ports:
       - "5050:5050"
-    env_file:
-      - ./server/.env
     volumes:
       - ./server:/app
       - /app/node_modules
+    env_file:
+      - ./server/.env
     environment:
       - NODE_ENV=development
-      - PORT=5050
+
