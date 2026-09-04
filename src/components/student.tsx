@@ -529,7 +529,7 @@ function Profile({ user, onLogout }: { user?: any; onLogout: () => void }) {
               />
             </Field>
 
-            <Field label="NIS / NIP / NIM">
+            <Field label="NIS / NIP">
               <input
                 className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
                 value={nisValue}
