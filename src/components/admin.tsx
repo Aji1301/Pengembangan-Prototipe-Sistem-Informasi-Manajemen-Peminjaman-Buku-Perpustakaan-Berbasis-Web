@@ -590,7 +590,7 @@ function MembersManager() {
       </div>
 
       <Card className="overflow-hidden">
-        <TableHead cols={["Anggota", "NIS / NIP / NIM", "Peran", "Total Pinjaman", "No HP"]} widths="grid-cols-[2fr_1fr_1fr_1fr_1fr]" />
+        <TableHead cols={["Anggota", "NIS / NIP", "Peran", "Total Pinjaman", "No HP"]} widths="grid-cols-[2fr_1fr_1fr_1fr_1fr]" />
         {rows.length === 0 ? (
           <div className="p-8 text-center text-ink-soft font-600">Tidak ada data anggota yang ditemukan.</div>
         ) : (
@@ -644,7 +644,7 @@ function MembersManager() {
               </Field>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Field label="NIS / NIP / NIM">
+              <Field label="NIS / NIP">
                 <input
                   className={inputCls}
                   placeholder="19850101..."
