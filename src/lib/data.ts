@@ -53,16 +53,10 @@ export type Loan = {
 };
 
 export const CATEGORIES: { name: string }[] = [
-  { name: "Fiksi" },
-  { name: "Non-Fiksi" },
-  { name: "Sains" },
+  { name: "Mata Pelajaran" },
+  { name: "Dongeng Nusantara" },
+  { name: "Sains dan Alam" },
   { name: "Sejarah" },
-  { name: "Matematika" },
-  { name: "Bahasa" },
-  { name: "Agama" },
-  { name: "Seni & Budaya" },
-  { name: "Teknologi" },
-  { name: "Ensiklopedia" },
 ];
 
 export const BOOKS: Book[] = [];

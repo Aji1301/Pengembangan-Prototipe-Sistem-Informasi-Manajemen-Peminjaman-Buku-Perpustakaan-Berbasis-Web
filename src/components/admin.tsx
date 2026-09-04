@@ -47,13 +47,12 @@ export default function AdminApp({ user, onLogout }: { user?: any; onLogout: () 
   return (
     <div className="min-h-full lg:grid lg:grid-cols-[248px_1fr]">
       <aside className="sticky top-0 hidden h-screen flex-col border-r border-border bg-forest-deep p-5 text-paper lg:flex">
-        <div className="flex items-center gap-2.5">
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-amber text-forest-deep">
-            <Icon.building className="w-5 h-5" />
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-center pt-2">
+            <Logo size={60} />
           </div>
-          <div className="leading-none">
-            <div className="font-display text-xl font-700">KANCIL</div>
-            <div className="text-[0.6rem] font-700 uppercase tracking-[0.15em] text-paper/60">Panel Petugas</div>
+          <div className="text-center text-[0.65rem] font-800 uppercase tracking-[0.18em] text-paper/70">
+            Panel Petugas
           </div>
         </div>
         <nav className="mt-9 space-y-1">
@@ -73,10 +72,22 @@ export default function AdminApp({ user, onLogout }: { user?: any; onLogout: () 
       </aside>
 
       <div className="min-w-0">
-        <div className="sticky top-0 z-20 flex items-center gap-2 overflow-x-auto border-b border-border bg-paper/95 px-4 py-3 backdrop-blur lg:hidden">
-          {NAV.map((n) => (
-            <button key={n.id} onClick={() => setView(n.id)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-700 ${active === n.id ? "bg-forest text-paper" : "text-ink-soft"}`}>{n.label}</button>
-          ))}
+        {/* Mobile top bar */}
+        <div className="sticky top-0 z-20 border-b border-border bg-paper/95 backdrop-blur lg:hidden">
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50">
+            <div className="flex items-center gap-2">
+              <Logo size={34} />
+              <span className="text-[0.65rem] font-800 uppercase tracking-wider bg-forest-soft text-forest px-2 py-0.5 rounded-full">Petugas</span>
+            </div>
+            <button onClick={onLogout} title="Keluar" className="p-1.5 text-ink-soft hover:text-danger rounded-lg transition">
+              <Icon.logout className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto px-4 py-2">
+            {NAV.map((n) => (
+              <button key={n.id} onClick={() => setView(n.id)} className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-700 ${active === n.id ? "bg-forest text-paper" : "text-ink-soft"}`}>{n.label}</button>
+            ))}
+          </div>
         </div>
 
         <div className="mx-auto max-w-6xl px-5 py-7 sm:px-8 lg:py-9">
@@ -179,7 +190,7 @@ function Dashboard({ borrowings = [], onUpdateStatus, goto }: { borrowings?: any
 /* ---------------- Books Manager ---------------- */
 function BooksManager() {
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState("Semua");
+  const [cat, setCat] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [cover, setCover] = useState<string | null>(null);
   const [books, setBooks] = useState<any[]>([]);
@@ -195,8 +206,6 @@ function BooksManager() {
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("Mata Pelajaran");
   const [editingBook, setEditingBook] = useState<any | null>(null);
-
-  const cats = ["Semua", ...CATEGORIES.map((c) => c.name)];
 
   const fetchBooks = () => {
     api.getBooks().then((res) => {
@@ -286,42 +295,34 @@ function BooksManager() {
       alert(err.message || "Gagal menghapus buku.");
     }
   };
-
-  const filterCategories = ["Semua", ...CATEGORIES.map((c) => c.name)];
-
   const rows = books.filter((b) => {
     const bCat = typeof b.category === "object" ? b.category?.name : (b.category || "Umum");
-    const okC = cat === "Semua" || (bCat && String(bCat).toLowerCase().trim() === cat.toLowerCase().trim());
+    const okC = !cat || (bCat && String(bCat).toLowerCase().trim() === cat.toLowerCase().trim());
     const okQ = !q || b.title.toLowerCase().includes(q.toLowerCase()) || b.author.toLowerCase().includes(q.toLowerCase());
     return okC && okQ;
   });
 
   return (
     <div className="space-y-6">
-      <PageHead title="Kelola Data Buku" desc={`${rows.length} judul ditampilkan (${cat === "Semua" ? "semua kategori" : `kategori ${cat}`}).`} action={<Button onClick={() => { closeAdd(); setShowAdd(true); }}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
+      <PageHead title="Kelola Data Buku" desc={`${rows.length} judul ditampilkan.`} action={<Button onClick={() => { closeAdd(); setShowAdd(true); }}><Icon.plus className="w-5 h-5" /> Tambah Buku</Button>} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SearchInput value={q} onChange={setQ} placeholder="Cari judul atau penulis…" />
-        <select value={cat} onChange={(e) => setCat(e.target.value)} className={`${inputCls} w-auto font-700`}>
-          {filterCategories.map((c) => (
-            <option key={c} value={c}>{c === "Semua" ? "Semua Kategori" : c}</option>
-          ))}
-        </select>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {filterCategories.map((c) => {
-          const active = cat === c;
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 mt-4">
+        {CATEGORIES.map((c) => {
+          const active = cat === c.name;
           return (
             <button
-              key={c}
-              onClick={() => setCat(c)}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-800 transition ${active
-                ? "bg-forest text-paper shadow-sm"
-                : "border border-border bg-white text-ink-soft hover:border-forest hover:text-forest"
+              key={c.name}
+              onClick={() => setCat(active ? "" : c.name)}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-5 py-1.5 text-sm font-600 transition ${active
+                ? "bg-forest text-paper shadow-sm border border-forest"
+                : "border border-border bg-white text-ink hover:border-forest hover:text-forest"
                 }`}
             >
-              <span>{c}</span>
+              {c.name}
             </button>
           );
         })}
@@ -520,6 +521,7 @@ function MembersManager() {
   const [password, setPassword] = useState("");
   const [nim, setNim] = useState("");
   const [phone, setPhone] = useState("");
+  const [kelas, setKelas] = useState("");
   const [memberRole, setMemberRole] = useState<"STUDENT" | "TEACHER">("STUDENT");
   const [loading, setLoading] = useState(false);
 
@@ -548,6 +550,7 @@ function MembersManager() {
         password,
         nim: nim || undefined,
         phone: phone || undefined,
+        kelas: kelas || undefined,
         role: memberRole,
       });
       setShowAdd(false);
@@ -556,6 +559,7 @@ function MembersManager() {
       setPassword("");
       setNim("");
       setPhone("");
+      setKelas("");
       setMemberRole("STUDENT");
 
       fetchUsersList();
@@ -576,7 +580,7 @@ function MembersManager() {
     <div className="space-y-6">
       <PageHead
         title="Kelola Data Anggota (Siswa & Guru)"
-        desc={`${members.length} anggota terdaftar di database MySQL.`}
+        desc={`${members.length} anggota terdaftar.`}
         action={<Button onClick={() => setShowAdd(true)}><Icon.plus className="w-5 h-5" /> Tambah Anggota</Button>}
       />
 
@@ -661,16 +665,26 @@ function MembersManager() {
                 />
               </Field>
             </div>
-            <Field label="Peran Anggota">
-              <select
-                value={memberRole}
-                onChange={(e) => setMemberRole(e.target.value as "STUDENT" | "TEACHER")}
-                className={inputCls}
-              >
-                <option value="STUDENT">Siswa (STUDENT)</option>
-                <option value="TEACHER">Guru (TEACHER)</option>
-              </select>
-            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Peran Anggota">
+                <select
+                  value={memberRole}
+                  onChange={(e) => setMemberRole(e.target.value as "STUDENT" | "TEACHER")}
+                  className={inputCls}
+                >
+                  <option value="STUDENT">Siswa (STUDENT)</option>
+                  <option value="TEACHER">Guru (TEACHER)</option>
+                </select>
+              </Field>
+              <Field label="Kelas / Jurusan">
+                <input
+                  className={inputCls}
+                  placeholder="Mis. X IPA 1 (Kosongkan jika Guru)"
+                  value={kelas}
+                  onChange={(e) => setKelas(e.target.value)}
+                />
+              </Field>
+            </div>
 
             <div className="mt-6 flex justify-end gap-3 pt-3 border-t border-border">
               <Button variant="ghost" onClick={() => setShowAdd(false)}>Batal</Button>
@@ -704,7 +718,7 @@ function AdminManager() {
     <div className="space-y-6">
       <PageHead
         title="Data Petugas Admin (Pengelola Utama)"
-        desc="Akun terautentikasi pengelola sistem & administrasi perpustakaan (MySQL)."
+        desc="Akun terautentikasi pengelola sistem & administrasi perpustakaan."
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -807,7 +821,7 @@ function LoansManager({ borrowings, onUpdateStatus }: { borrowings: any[]; onUpd
 
   return (
     <div className="space-y-6">
-      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku dari siswa (MySQL Realtime)." action={<Button onClick={openAddModal}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
+      <PageHead title="Data Peminjaman" desc="Semua transaksi peminjaman buku dari siswa." action={<Button onClick={openAddModal}><Icon.plus className="w-5 h-5" /> Tambah Peminjaman</Button>} />
 
       <div className="flex flex-wrap gap-2">
         {["Semua", "Dipinjam", "Terlambat", "Dikembalikan"].map((f) => (
@@ -922,7 +936,7 @@ function ReturnsManager({ borrowings = [], onUpdateStatus }: { borrowings?: any[
 
   return (
     <div className="space-y-6">
-      <PageHead title="Data Pengembalian Buku (MySQL)" desc={`Total ${returnedLoans.length} buku telah berhasil dikembalikan.`} />
+      <PageHead title="Data Pengembalian Buku" desc={`Total ${returnedLoans.length} buku telah berhasil dikembalikan.`} />
 
       <div className="grid grid-cols-2 gap-4">
         <Card className="p-5 bg-forest-soft/30 border-forest/20">
@@ -997,7 +1011,7 @@ function Reports({ borrowings = [] }: { borrowings?: any[] }) {
 
   return (
     <div className="space-y-6">
-      <PageHead title="Laporan Database MySQL" desc="Rekap peminjaman, pengembalian, dan keterlambatan." />
+      <PageHead title="Laporan" desc="Rekap peminjaman, pengembalian, dan keterlambatan." />
 
       <div className="grid grid-cols-3 gap-4">
         <ReportCard active={tab === "pinjam"} onClick={() => setTab("pinjam")} label="Total Peminjaman" value={borrowed.length} icon="swap" />
