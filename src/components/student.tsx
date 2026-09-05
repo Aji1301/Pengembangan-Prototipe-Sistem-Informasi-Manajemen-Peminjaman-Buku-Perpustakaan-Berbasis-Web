@@ -408,7 +408,7 @@ function History() {
     <div className="space-y-6">
       <header>
         <h1 className="font-display text-4xl font-700">Riwayat Peminjaman</h1>
-        <p className="mt-1 text-ink-soft">Semua riwayat pengajuan & peminjaman buku kamu di database.</p>
+        <p className="mt-1 text-ink-soft">Semua riwayat pengajuan & peminjaman buku.</p>
       </header>
 
       <Card className="overflow-hidden">
