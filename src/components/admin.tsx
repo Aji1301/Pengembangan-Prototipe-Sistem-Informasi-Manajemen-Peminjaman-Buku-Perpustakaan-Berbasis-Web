@@ -686,7 +686,7 @@ function MembersManager() {
               <Field label="Kelas">
                 <input
                   className={inputCls}
-                  placeholder="Mis. X IPA 1 (Kosongkan jika Guru)"
+                  placeholder="Mis. VI (Kosongkan jika Guru)"
                   value={kelas}
                   onChange={(e) => setKelas(e.target.value)}
                 />
@@ -854,7 +854,10 @@ function LoansManager({ borrowings, onUpdateStatus }: { borrowings: any[]; onUpd
               <div className="flex items-center gap-2">
                 <StatusBadge status={l.status === "BORROWED" ? "Dipinjam" : l.status === "RETURNED" ? "Dikembalikan" : l.status === "PENDING" ? "Tersedia" : l.status} />
                 {l.status === "PENDING" && (
-                  <Button size="sm" onClick={() => onUpdateStatus(l.id, "BORROWED")} className="py-1 px-2 text-xs">Setujui</Button>
+                  <>
+                    <Button size="sm" onClick={() => onUpdateStatus(l.id, "BORROWED")} className="py-1 px-2 text-xs">Setujui</Button>
+                    <Button size="sm" variant="danger" onClick={() => onUpdateStatus(l.id, "REJECTED")} className="py-1 px-2 text-xs">Tolak</Button>
+                  </>
                 )}
                 {l.status === "BORROWED" && (
                   <Button size="sm" variant="secondary" onClick={() => onUpdateStatus(l.id, "RETURNED")} className="py-1 px-2 text-xs">Kembalikan</Button>

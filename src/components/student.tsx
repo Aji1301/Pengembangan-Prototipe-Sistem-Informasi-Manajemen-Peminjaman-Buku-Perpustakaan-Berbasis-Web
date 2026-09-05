@@ -317,8 +317,8 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
   }, []);
 
   const active = loansList.length > 0 
-    ? loansList.filter((l) => l.status !== "RETURNED" && l.status !== "Dikembalikan") 
-    : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan");
+    ? loansList.filter((l) => l.status !== "RETURNED" && l.status !== "Dikembalikan" && l.status !== "REJECTED" && l.status !== "Ditolak") 
+    : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan" && l.status !== "Ditolak");
 
   return (
     <div className="space-y-6">
@@ -426,7 +426,7 @@ function History() {
             const bookAuthor = l.book?.author || "-";
             const borrowDateStr = l.borrowDate ? String(l.borrowDate).split("T")[0] : "-";
             const returnDateStr = l.returnDate ? String(l.returnDate).split("T")[0] : l.dueDate ? String(l.dueDate).split("T")[0] : "—";
-            const statusLabel = l.status === "RETURNED" ? "Dikembalikan" : l.status === "BORROWED" ? "Dipinjam" : l.status === "PENDING" ? "Tersedia" : l.status;
+            const statusLabel = l.status === "RETURNED" ? "Dikembalikan" : l.status === "BORROWED" ? "Dipinjam" : l.status === "PENDING" ? "Tersedia" : l.status === "REJECTED" ? "Ditolak" : l.status;
 
             return (
               <div key={l.id} className="grid gap-2 border-b border-border px-5 py-4 last:border-0 sm:grid-cols-[2fr_1.2fr_1.2fr_1fr] sm:items-center sm:gap-4">
