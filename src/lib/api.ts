@@ -1,4 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5050/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" && window.location.hostname.includes("railway.app")
+    ? "https://server-pengembangan-prototipe-sistem-informasi-m-production.up.railway.app/api"
+    : "http://localhost:5050/api");
 
 export function getAuthToken(): string | null {
   return localStorage.getItem("kancil_token");
