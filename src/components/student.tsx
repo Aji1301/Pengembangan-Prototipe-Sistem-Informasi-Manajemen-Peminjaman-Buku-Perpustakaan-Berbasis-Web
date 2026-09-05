@@ -318,7 +318,7 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
 
   const active = loansList.length > 0 
     ? loansList.filter((l) => l.status !== "RETURNED" && l.status !== "Dikembalikan" && l.status !== "REJECTED" && l.status !== "Ditolak") 
-    : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan" && l.status !== "Ditolak");
+    : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan");
 
   return (
     <div className="space-y-6">
