@@ -553,7 +553,7 @@ function Profile({ user, onLogout }: { user?: any; onLogout: () => void }) {
               />
             </Field>
 
-            <Field label="Kelas / Jurusan">
+            <Field label="Kelas">
               <input
                 className={`${inputCls} bg-paper-2/60 font-700 text-ink-soft cursor-not-allowed`}
                 value={u.kelas || "-"}

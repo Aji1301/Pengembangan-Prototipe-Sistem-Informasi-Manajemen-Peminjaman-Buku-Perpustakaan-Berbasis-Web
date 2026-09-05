@@ -683,7 +683,7 @@ function MembersManager() {
                   <option value="TEACHER">Guru (TEACHER)</option>
                 </select>
               </Field>
-              <Field label="Kelas / Jurusan">
+              <Field label="Kelas">
                 <input
                   className={inputCls}
                   placeholder="Mis. X IPA 1 (Kosongkan jika Guru)"
