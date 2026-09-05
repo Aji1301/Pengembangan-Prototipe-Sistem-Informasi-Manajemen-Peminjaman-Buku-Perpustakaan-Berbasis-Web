@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 
 export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" | "staff") => void }) {
   const [books, setBooks] = useState<any[]>([]);
+  const [animateTitle, setAnimateTitle] = useState(false);
 
   const [booksCount, setBooksCount] = useState(0);
   const [membersCount, setMembersCount] = useState(0);
@@ -53,7 +54,11 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
               <span>Perpustakaan Digital Sekolah</span>
             </div>
 
-            <h1 className="font-display text-4xl sm:text-5xl lg:text-[3.4rem] font-800 leading-[1.15] text-[#222222]">
+            <h1 
+              className={`font-display text-4xl sm:text-5xl lg:text-[3.4rem] font-800 leading-[1.15] text-[#222222] cursor-default select-none ${animateTitle ? "animate-jelly" : ""}`}
+              onMouseEnter={() => setAnimateTitle(true)}
+              onAnimationEnd={() => setAnimateTitle(false)}
+            >
               Jelajahi Dunia Pengetahuan Bersama <span className="text-[#009BF2]">KANCIL</span>
             </h1>
 
@@ -105,17 +110,17 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
               />
 
               {/* Floating Top Right Tag */}
-              <div className="absolute top-4 right-4 bg-[#A7D02C] text-[#1D3A05] px-4 py-1.5 rounded-full font-900 text-xs shadow-lg transform rotate-2">
+              <div className="absolute top-4 right-4 bg-[#A7D02C] text-[#1D3A05] px-4 py-1.5 rounded-full font-900 text-xs shadow-lg transform animate-float">
                 Gratis untuk siswa!
               </div>
 
               {/* Floating Bottom Badge */}
-              <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-2.5 rounded-2xl shadow-xl border border-border flex items-center gap-3">
+              <div className="absolute bottom-6 left-6 bg-white/95 backdrop-blur px-4 py-2.5 rounded-2xl shadow-xl border border-border flex items-center gap-3 animate-float [animation-delay:1.5s]">
                 <div className="h-10 w-10 rounded-full bg-white grid place-items-center text-white text-xs font-900 overflow-hidden p-1 border border-border shadow-xs">
                   <img src="/logo.png" alt="Kancil" className="w-full h-full object-contain" />
                 </div>
                 <div>
-                  <p className="font-800 text-xs text-ink leading-tight">Halo, aku Kancil! 🦌</p>
+                  <p className="font-800 text-xs text-ink leading-tight">Halo, aku Kancil!</p>
                   <p className="text-[0.7rem] text-ink-soft font-600">Temanmu membaca</p>
                 </div>
               </div>
@@ -234,8 +239,8 @@ export default function LandingPage({ onGoAuth }: { onGoAuth: (mode?: "student" 
         <div className="max-w-7xl mx-auto px-6 sm:px-10 grid grid-cols-1 md:grid-cols-3 gap-10 pb-12 border-b border-white/20">
           {/* Col 1: Logo & Info */}
           <div className="space-y-4">
-            <div className="bg-white p-2.5 rounded-xl inline-block">
-              <Logo size={42} />
+            <div className="inline-block">
+              <Logo size={80} />
             </div>
             <p className="text-white/80 text-sm leading-relaxed max-w-sm">
               Perpustakaan digital SD Negeri 03 Cendekia — menumbuhkan generasi anak Indonesia yang cinta literasi.

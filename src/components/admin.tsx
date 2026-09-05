@@ -32,6 +32,13 @@ export default function AdminApp({ user, onLogout }: { user?: any; onLogout: () 
 
   useEffect(() => {
     fetchBorrowings();
+    
+    // Auto-refresh data peminjaman setiap 5 detik
+    const interval = setInterval(() => {
+      fetchBorrowings();
+    }, 5000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleUpdateStatus = async (id: number, status: string) => {

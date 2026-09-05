@@ -40,6 +40,20 @@ html, body, #root {
 
   --radius-xl: 1.25rem;
   --radius-2xl: 1.75rem;
+
+  --animate-float: float 3s ease-in-out infinite;
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(2deg); }
+    50% { transform: translateY(-8px) rotate(4deg); }
+  }
+
+  --animate-jelly: jelly 0.6s ease;
+  @keyframes jelly {
+    0%, 100% { transform: scale(1, 1); }
+    25% { transform: scale(1.05, 0.95); }
+    50% { transform: scale(0.98, 1.02); }
+    75% { transform: scale(1.01, 0.99); }
+  }
 }
 
 html,
