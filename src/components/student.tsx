@@ -316,7 +316,9 @@ function MyLoans({ onOpen }: { onOpen: (b: Book) => void }) {
     }).catch(() => { });
   }, []);
 
-  const active = loansList.length > 0 ? loansList : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan");
+  const active = loansList.length > 0 
+    ? loansList.filter((l) => l.status !== "RETURNED" && l.status !== "Dikembalikan") 
+    : LOANS.filter((l) => l.memberId === CURRENT_USER.id && l.status !== "Dikembalikan");
 
   return (
     <div className="space-y-6">
